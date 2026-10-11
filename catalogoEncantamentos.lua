@@ -91,7 +91,8 @@ CatalogoEncantamentos.itens = {
     nome = "Aprendiz arcano",
     classe = "I",
     preco = 5,
-    descricao = "escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +1 de acerto ou",
+    -- Texto conferido contra livro/por-documento/2.9.md:688
+    descricao = "escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +1 de acerto ou +1 dado de dano/escudo/cura; Escolha durante fabricação",
   },
   {
     nome = "Aracnopassos",
@@ -160,13 +161,15 @@ CatalogoEncantamentos.itens = {
     nome = "Sifão arcano",
     classe = "I",
     preco = 5,
-    descricao = "sempre que uma arma/canalizador com este encantamento fizer um",
+    -- Texto conferido contra livro/por-documento/2.9.md:701
+    descricao = "sempre que uma arma/canalizador com este encantamento fizer um Acerto Crítico, irá restaurar 1d6 de Aura ou Mana de seu portador.",
   },
   {
     nome = "Sifão de sangue",
     classe = "I",
     preco = 5,
-    descricao = "sempre que uma arma/canalizador com este encantamento fizer um",
+    -- Texto conferido contra livro/por-documento/2.9.md:702
+    descricao = "sempre que uma arma/canalizador com este encantamento fizer um Acerto Crítico, irá restaurar 1d6 de Vida ou Vitae de seu portador.",
   },
   {
     nome = "Sorte de aventureiro",
@@ -232,7 +235,8 @@ CatalogoEncantamentos.itens = {
     nome = "Guerreiro arcano",
     classe = "II",
     preco = 10,
-    descricao = "escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +2 de acerto ou",
+    -- Texto conferido contra livro/por-documento/2.9.md:714
+    descricao = "escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +2 de acerto ou +10 de dano/escudo/cura; Escolha durante fabricação",
   },
   {
     nome = "Incorporação melhorada",
@@ -341,7 +345,8 @@ CatalogoEncantamentos.itens = {
     nome = "Artefato arcano",
     classe = "III",
     preco = 15,
-    descricao = "permite que um pergaminho de habilidades seja absorvido pelo objeto com este encantamento, e dará ao portador a capacidade de usar a habilidade por",
+    -- Texto conferido contra livro/por-documento/2.9.md:733
+    descricao = "permite que um pergaminho de habilidades seja absorvido pelo objeto com este encantamento, e dará ao portador a capacidade de usar a habilidade por uma estação, com o gasto de aura/mana.",
   },
   {
     nome = "Contragolpe",
@@ -365,13 +370,15 @@ CatalogoEncantamentos.itens = {
     nome = "Golpe arcano",
     classe = "III",
     preco = 15,
-    descricao = "aumenta o passo de dano da arma em 1. Em canalizadores energéticos, apenas funciona com habilidades ou feitiços de",
+    -- Texto conferido contra livro/por-documento/2.9.md:737
+    descricao = "aumenta o passo de dano da arma em 1. Em canalizadores energéticos, apenas funciona com habilidades ou feitiços de dano.",
   },
   {
     nome = "Herói arcano",
     classe = "III",
     preco = 15,
-    descricao = "escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +3 de acerto ou",
+    -- Texto conferido contra livro/por-documento/2.9.md:738
+    descricao = "escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +3 de acerto ou +15 de dano/escudo/cura; Escolha durante fabricação",
   },
   {
     nome = "Incorporação Total",
@@ -384,7 +391,8 @@ CatalogoEncantamentos.itens = {
     nome = "Nemesis",
     classe = "III",
     preco = 15,
-    descricao = "durante o encantamento de uma armadura ou escudo, o portador escolhe um tipo de [",
+    -- Texto conferido contra livro/por-documento/2.9.md:740
+    descricao = "durante o encantamento de uma armadura ou escudo, o portador escolhe um tipo de [Criatura], que se tornará o Nemesis do objeto, e toda vez que enfrentar tais criaturas receberá +3 em todas as suas defesas.",
   },
   {
     nome = "Remover Encantamento III",
@@ -402,7 +410,8 @@ CatalogoEncantamentos.itens = {
     nome = "Tesouro do aventureiro",
     classe = "III",
     preco = 15,
-    descricao = "permite ao portador do objeto com este encantamento rolar todos os seus testes de",
+    -- Texto conferido contra livro/por-documento/2.9.md:743
+    descricao = "permite ao portador do objeto com este encantamento rolar todos os seus testes de loot com vantagem, e escolher o resultado que preferir.",
   },
 }
 

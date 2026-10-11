@@ -13527,6 +13527,11 @@
             "encCustom1Nome", "encCustom1Classe", "encCustom1Tipos", "encCustom1Efeito",
             "encCustom2Nome", "encCustom2Classe", "encCustom2Tipos", "encCustom2Efeito",
             "encCustom3Nome", "encCustom3Classe", "encCustom3Tipos", "encCustom3Efeito",
+            "encCustom4Nome", "encCustom4Classe", "encCustom4Tipos", "encCustom4Efeito",
+            "encCustom5Nome", "encCustom5Classe", "encCustom5Tipos", "encCustom5Efeito",
+            "encCustom6Nome", "encCustom6Classe", "encCustom6Tipos", "encCustom6Efeito",
+            "encCustom7Nome", "encCustom7Classe", "encCustom7Tipos", "encCustom7Efeito",
+            "encCustom8Nome", "encCustom8Classe", "encCustom8Tipos", "encCustom8Efeito",
             "visaoEscuro", "capacidade", "capacidadeTipo", "alcanceExtra",
             "imagem",
         }
@@ -13591,6 +13596,16 @@
             encCustom2Tipos = true, encCustom2Efeito = true,
             encCustom3Nome = true, encCustom3Classe = true,
             encCustom3Tipos = true, encCustom3Efeito = true,
+            encCustom4Nome = true, encCustom4Classe = true,
+            encCustom4Tipos = true, encCustom4Efeito = true,
+            encCustom5Nome = true, encCustom5Classe = true,
+            encCustom5Tipos = true, encCustom5Efeito = true,
+            encCustom6Nome = true, encCustom6Classe = true,
+            encCustom6Tipos = true, encCustom6Efeito = true,
+            encCustom7Nome = true, encCustom7Classe = true,
+            encCustom7Tipos = true, encCustom7Efeito = true,
+            encCustom8Nome = true, encCustom8Classe = true,
+            encCustom8Tipos = true, encCustom8Efeito = true,
         }
 
         local function codificarURL(s)
@@ -13735,12 +13750,12 @@
 
         -- O livro permite encantamentos criados por artífices e exige quatro
         -- informações: nome, classe, efeito desejado e tipos de equipamento
-        -- compatíveis. São até três registros porque nenhum item comporta
-        -- mais de três slots pelas regras atuais. Efeito personalizado é
-        -- documental/manual: a ficha não tenta adivinhar números do texto.
+        -- compatíveis. Suporta até 8 registros para atender itens com 4 ou mais
+        -- slots (como Artefatos Divinos ou itens forjados com slots extras).
+        -- Efeito personalizado é documental/manual: a ficha não tenta adivinhar números do texto.
         function encantamentosPersonalizadosDoItem(it)
             local r = {}
-            for i = 1, 3 do
+            for i = 1, 8 do
                 local prefixo = "encCustom" .. i
                 local nome = tostring((it or {})[prefixo .. "Nome"] or "")
                 if nome ~= "" then
@@ -14108,6 +14123,25 @@
         -- ---------------------------------------------------------------
         -- ENCANTAMENTOS NO EDITOR
         -- ---------------------------------------------------------------
+        local function calcularLinhasTexto(txt, caracteresPorLinha)
+            if txt == nil or txt == "" then return 1 end
+            caracteresPorLinha = caracteresPorLinha or 85
+            local totalLinhas = 0
+            local s = tostring(txt):gsub("\r\n", "\n"):gsub("\r", "\n")
+            for linha in (s .. "\n"):gmatch("(.-)\n") do
+                local tam = #linha
+                if tam == 0 then
+                    totalLinhas = totalLinhas + 1
+                else
+                    local l = math.ceil(tam / caracteresPorLinha)
+                    if l < 1 then l = 1 end
+                    totalLinhas = totalLinhas + l
+                end
+            end
+            if totalLinhas < 1 then totalLinhas = 1 end
+            return totalLinhas
+        end
+
         function atualizarListaEncantamentosItem(it, mostrarGrupo)
             local lista = encantamentosDoItem(it)
             local personalizados = encantamentosPersonalizadosDoItem(it)
@@ -14151,28 +14185,35 @@
                 end
             end
             local alturaDetalhes = 0
-            for i = 1, 3 do
+            for i = 1, 8 do
                 local painel = self["edIt_encDetalhe" .. i]
                 local titulo = self["edIt_encDetalheTitulo" .. i]
                 local texto = self["edIt_encDetalheTexto" .. i]
                 local dados = detalhes[i]
                 local altura = 0
                 if dados ~= nil then
-                    local linhas = math.ceil(#tostring(dados.texto or "") / 100)
-                    if linhas < 1 then linhas = 1 end
-                    if linhas > 4 then linhas = 4 end
-                    altura = 30 + linhas * 16
+                    local linhas = calcularLinhasTexto(dados.texto, 85)
+                    altura = 32 + (linhas * 18)
                     if titulo ~= nil then titulo:setText(dados.titulo) end
                     if texto ~= nil then texto:setText(dados.texto) end
+                else
+                    if titulo ~= nil then titulo:setText("") end
+                    if texto ~= nil then texto:setText("") end
                 end
-                if painel ~= nil then definirAlturaPod(painel, altura) end
-                alturaDetalhes = alturaDetalhes + altura
+                if painel ~= nil then
+                    if altura > 0 then
+                        definirAlturaPod(painel, altura + 4)
+                        alturaDetalhes = alturaDetalhes + altura + 4
+                    else
+                        definirAlturaPod(painel, 0)
+                    end
+                end
             end
             if self.edIt_grupoencantamento ~= nil then
                 if mostrarGrupo == false then
                     definirAlturaPod(self.edIt_grupoencantamento, 0)
                 else
-                    definirAlturaPod(self.edIt_grupoencantamento, 100 + alturaDetalhes)
+                    definirAlturaPod(self.edIt_grupoencantamento, 102 + alturaDetalhes)
                 end
             end
         end
@@ -14222,12 +14263,7 @@
                 end
                 if rect ~= nil then
                     rect:setStrokeColor(aplicados[e.nome] and COR.gold or COR.line)
-                    -- 40px comportam título + uma linha. Cada bloco adicional
-                    -- de até 100 caracteres recebe mais 16px; a própria lista
-                    -- rola, então crescer a linha não estoura o popup.
-                    local linhas = math.ceil(#textoCompleto / 100)
-                    if linhas < 1 then linhas = 1 end
-                    if linhas > 3 then linhas = 3 end
+                    local linhas = calcularLinhasTexto(textoCompleto, 100)
                     definirAlturaPod(rect, 24 + (linhas * 16))
                 end
             end
@@ -14266,11 +14302,99 @@
         -- ---------------------------------------------------------------
         encCustomEmEdicao = 1
 
+        local function calcularTotalRegEncCustom(it)
+            local totalReg = math.max(1, math.min(8, n(it.slotsEnc)))
+            for i = totalReg + 1, 8 do
+                if tostring(it["encCustom" .. i .. "Nome"] or "") ~= "" then totalReg = i end
+            end
+            return totalReg
+        end
+
+        local function atualizarCatalogoSlotsEncCustom(it)
+            local totalReg = calcularTotalRegEncCustom(it)
+            if self.popEncCustom_lblSubtituloCatalogo ~= nil then
+                local nomeItem = tostring(it.nome or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                if nomeItem == "" then nomeItem = "ITEM" end
+                self.popEncCustom_lblSubtituloCatalogo:setText(
+                    string.upper(nomeItem) .. "  ·  " .. totalReg .. " SLOT(S) DISPONÍVEIS")
+            end
+            for i = 1, 8 do
+                local wrap = self["popEncCustom_wrapCard" .. i]
+                local card = self["popEncCustom_card" .. i]
+                local badge = self["popEncCustom_cardBadge" .. i]
+                local lblNome = self["popEncCustom_cardNome" .. i]
+                local lblDetalhe = self["popEncCustom_cardDetalhe" .. i]
+                local lblAcao = self["popEncCustom_cardAcao" .. i]
+                if wrap ~= nil then
+                    if i <= totalReg then
+                        definirAlturaPod(wrap, 46)
+                        local prefixo = "encCustom" .. i
+                        local nome = tostring(it[prefixo .. "Nome"] or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                        local classe = tostring(it[prefixo .. "Classe"] or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                        local tipos = tostring(it[prefixo .. "Tipos"] or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                        local efeito = tostring(it[prefixo .. "Efeito"] or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                        if badge ~= nil then
+                            badge:setText("REGISTRO " .. i)
+                            badge:setFontColor(nome ~= "" and COR.gold or COR.muted)
+                        end
+                        if card ~= nil then
+                            card:setStrokeColor(nome ~= "" and COR.gold or COR.line)
+                        end
+                        if lblNome ~= nil then
+                            if nome ~= "" then
+                                lblNome:setText(nome .. (classe ~= "" and ("  ·  CLASSE " .. classe) or ""))
+                                lblNome:setFontColor(COR.gold)
+                            else
+                                lblNome:setText("— Slot Disponível —")
+                                lblNome:setFontColor(COR.faint)
+                            end
+                        end
+                        if lblDetalhe ~= nil then
+                            if nome ~= "" then
+                                local resumo = (tipos ~= "" and (tipos .. "  ·  ") or "") .. efeito
+                                lblDetalhe:setText(resumo)
+                                lblDetalhe:setFontColor(COR.text)
+                            else
+                                lblDetalhe:setText("Nenhum encantamento personalizado registrado neste slot.")
+                                lblDetalhe:setFontColor(COR.faint)
+                            end
+                        end
+                        if lblAcao ~= nil then
+                            if nome ~= "" then
+                                lblAcao:setText("EDITAR")
+                                lblAcao:setFontColor(COR.aura)
+                            else
+                                lblAcao:setText("+ REGISTRAR")
+                                lblAcao:setFontColor(COR.gold)
+                            end
+                        end
+                    else
+                        definirAlturaPod(wrap, 0)
+                    end
+                end
+            end
+        end
+
+        function mostrarCatalogoEncCustom()
+            if self.popEncCustom_viewCatalogo ~= nil then self.popEncCustom_viewCatalogo.visible = true end
+            if self.popEncCustom_viewEditor ~= nil then self.popEncCustom_viewEditor.visible = false end
+            if itemEmEdicao ~= nil then
+                local lista = lerItens()
+                local it = lista[itemEmEdicao]
+                if it ~= nil then atualizarCatalogoSlotsEncCustom(it) end
+            end
+        end
+
         local function preencherEditorEncCustom(it, indice)
             encCustomEmEdicao = indice
+            local totalReg = calcularTotalRegEncCustom(it)
             local prefixo = "encCustom" .. indice
             if self.popEncCustom_lblSlot ~= nil then
-                self.popEncCustom_lblSlot:setText("REGISTRO " .. indice .. " DE 3")
+                self.popEncCustom_lblSlot:setText("REGISTRO " .. indice .. " DE " .. totalReg)
+            end
+            if self.popEncCustom_lblBtnVoltar ~= nil then
+                self.popEncCustom_lblBtnVoltar:setText(
+                    "ESCOLHER OUTRO SLOT (REGISTRO " .. indice .. " DE " .. totalReg .. ")")
             end
             local campos = {
                 nome = "Nome", classe = "Classe", tipos = "Tipos", efeito = "Efeito",
@@ -14279,38 +14403,22 @@
                 local widget = self["popEncCustom_" .. controle]
                 if widget ~= nil then widget:setText(tostring(it[prefixo .. sufixo] or "")) end
             end
-            for i = 1, 3 do
-                local botao = self["popEncCustom_btn" .. i]
-                local rotulo = self["popEncCustom_lbl" .. i]
-                if botao ~= nil then
-                    botao:setStrokeColor(i == indice and COR.gold or COR.line)
-                    botao:setStrokeSize(i == indice and 2 or 1)
-                    if rotulo ~= nil then rotulo:setFontColor(i == indice and COR.gold or COR.muted) end
-                end
-            end
         end
 
         function selecionarRegistroEncCustom(indice)
             if itemEmEdicao == nil then return end
             local lista = lerItens()
             local it = lista[itemEmEdicao]
-            if it ~= nil then preencherEditorEncCustom(it, indice) end
+            if it ~= nil then
+                preencherEditorEncCustom(it, indice)
+                if self.popEncCustom_viewCatalogo ~= nil then self.popEncCustom_viewCatalogo.visible = false end
+                if self.popEncCustom_viewEditor ~= nil then self.popEncCustom_viewEditor.visible = true end
+            end
         end
 
         function abrirPopupEncantamentoPersonalizado()
             if itemEmEdicao == nil or self.popEncantamentoPersonalizado == nil then return end
-
-            local lista = lerItens()
-            local it = lista[itemEmEdicao]
-            if it == nil then return end
-            local escolhido = 1
-            for i = 1, 3 do
-                if tostring(it["encCustom" .. i .. "Nome"] or "") == "" then
-                    escolhido = i
-                    break
-                end
-            end
-            preencherEditorEncCustom(it, escolhido)
+            mostrarCatalogoEncCustom()
             abrirPopupAjustado(self.popEncantamentoPersonalizado, 640, 540)
         end
 
@@ -14344,8 +14452,8 @@
             gravarItens(lista)
             atualizarListaEncantamentosItem(it)
             atualizarListaEncPopup()
-            fecharPopupEncantamentoPersonalizado()
             recalcularTudo()
+            mostrarCatalogoEncCustom()
             avisarInventario("Encantamento personalizado “" .. nome .. "” aplicado. O efeito fica registrado para resolução manual da mesa.", COR.moss)
         end
 
@@ -14362,8 +14470,8 @@
             gravarItens(lista)
             atualizarListaEncantamentosItem(it)
             atualizarListaEncPopup()
-            fecharPopupEncantamentoPersonalizado()
             recalcularTudo()
+            mostrarCatalogoEncCustom()
             if nome ~= "" then avisarInventario("Encantamento personalizado “" .. nome .. "” removido.", COR.muted) end
         end
 
@@ -16153,7 +16261,7 @@
                          O numero e ESCRITO A MAO aqui e conferido pela
                          checagem 27 contra o module.xml - se alguem esquecer
                          de subir um dos dois, o build para. -->
-                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.35" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
+                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.36" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
                     <label name="lblSecaoAtual" align="client" text="SEÇÃO 01  •  DADOS PESSOAIS" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="12" vertTextAlign="center" margins="{left=8}"/>
                 </layout>
 
@@ -28997,15 +29105,46 @@
                                     </layout>
                                 </layout>
                                 <label name="edIt_lblEncantados" align="top" height="20" text="" fontFamily="EB Garamond" fontColor="#54636B" fontSize="11" wordWrap="false" margins="{top=2}" hitTest="false"/>
-                                <rectangle name="edIt_encDetalhe1" align="top" height="0" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
-                                    <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo1" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto1" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
-                                </rectangle>
-                                <rectangle name="edIt_encDetalhe2" align="top" height="0" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
-                                    <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo2" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto2" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
-                                </rectangle>
-                                <rectangle name="edIt_encDetalhe3" align="top" height="0" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
-                                    <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo3" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto3" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
-                                </rectangle>
+                                <layout name="edIt_encDetalhe1" align="top" height="0">
+                                    <rectangle align="client" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
+                                        <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo1" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto1" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
+                                    </rectangle>
+                                </layout>
+                                <layout name="edIt_encDetalhe2" align="top" height="0">
+                                    <rectangle align="client" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
+                                        <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo2" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto2" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
+                                    </rectangle>
+                                </layout>
+                                <layout name="edIt_encDetalhe3" align="top" height="0">
+                                    <rectangle align="client" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
+                                        <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo3" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto3" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
+                                    </rectangle>
+                                </layout>
+                                <layout name="edIt_encDetalhe4" align="top" height="0">
+                                    <rectangle align="client" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
+                                        <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo4" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto4" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
+                                    </rectangle>
+                                </layout>
+                                <layout name="edIt_encDetalhe5" align="top" height="0">
+                                    <rectangle align="client" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
+                                        <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo5" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto5" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
+                                    </rectangle>
+                                </layout>
+                                <layout name="edIt_encDetalhe6" align="top" height="0">
+                                    <rectangle align="client" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
+                                        <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo6" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto6" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
+                                    </rectangle>
+                                </layout>
+                                <layout name="edIt_encDetalhe7" align="top" height="0">
+                                    <rectangle align="client" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
+                                        <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo7" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto7" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
+                                    </rectangle>
+                                </layout>
+                                <layout name="edIt_encDetalhe8" align="top" height="0">
+                                    <rectangle align="client" color="#0A0E12" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=4}" hitTest="false">
+                                        <layout align="client" margins="{left=10,right=10,top=5,bottom=5}"><label name="edIt_encDetalheTitulo8" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#C9A24B" fontSize="11" fontStyle="bold" hitTest="false"/><label name="edIt_encDetalheTexto8" align="client" text="" fontFamily="EB Garamond" fontColor="#C9CFCE" fontSize="12" wordWrap="true" vertTextAlign="leading" hitTest="false"/></layout>
+                                    </rectangle>
+                                </layout>
                             </layout>
                         </rectangle>
                     </layout>
@@ -29464,7 +29603,7 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Aprendiz arcano");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Aprendizarcano" align="top" height="16" text="Aprendiz arcano" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Aprendizarcano" align="client" text="escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +1 de acerto ou" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Aprendizarcano" align="client" text="escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +1 de acerto ou +1 dado de dano/escudo/cura; Escolha durante fabricação" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Aracnopassos" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
@@ -29541,14 +29680,14 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Sifão arcano");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Sifaoarcano" align="top" height="16" text="Sifão arcano" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Sifaoarcano" align="client" text="sempre que uma arma/canalizador com este encantamento fizer um" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Sifaoarcano" align="client" text="sempre que uma arma/canalizador com este encantamento fizer um Acerto Crítico, irá restaurar 1d6 de Aura ou Mana de seu portador." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Sifaodesangue" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
                                 <event name="onClick"><![CDATA[alternarEncantamento("Sifão de sangue");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
-                                    <label name="lblEnc_Sifaodesangue" align="top" height="16" text="Sifão de sangue" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Sifaodesangue" align="client" text="sempre que uma arma/canalizador com este encantamento fizer um" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                     <label name="lblEnc_Sifaodesangue" align="top" height="16" text="Sifão de sangue" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
+                                    <label name="descEnc_Sifaodesangue" align="client" text="sempre que uma arma/canalizador com este encantamento fizer um Acerto Crítico, irá restaurar 1d6 de Vida ou Vitae de seu portador." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Sortedeaventureiro" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
@@ -29562,7 +29701,7 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Telemancia");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Telemancia" align="top" height="16" text="Telemancia" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Telemancia" align="client" text="o portador do objeto com este encantamento se torna capaz de enviar mensagens telepáticas curtas para aliados a até 8 metros de distância; 3 usos por " fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Telemancia" align="client" text="o portador do objeto com este encantamento se torna capaz de enviar mensagens telepáticas curtas para aliados a até 8 metros de distância; 3 usos por hora." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Vontadefortalecida" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
@@ -29577,7 +29716,7 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Altar do aventureiro");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Altardoaventureiro" align="top" height="16" text="Altar do aventureiro" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Altardoaventureiro" align="client" text="sempre que o portador do objeto com este encantamento gastar um ponto de favor, deverá rolar 1d100: se tirar de 85 a 95, meio ponto de favor será rest" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Altardoaventureiro" align="client" text="sempre que o portador do objeto com este encantamento gastar um ponto de favor, deverá rolar 1d100: se tirar de 85 a 95, meio ponto de favor será restituído; Acima de 95 o ponto inteiro." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Autoequipamento" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
@@ -29598,7 +29737,7 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Chamado do portador");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Chamadodoportador" align="top" height="16" text="Chamado do portador" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Chamadodoportador" align="client" text="o portador do objeto com este encantamento gasta uma ação bônus para fazê-lo retornar voando para si; Raio de funcionamento [rank] quilômetros de dist" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Chamadodoportador" align="client" text="o portador do objeto com este encantamento gasta uma ação bônus para fazê-lo retornar voando para si; Raio de funcionamento [rank] quilômetros de distância." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Domesticador" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
@@ -29619,14 +29758,14 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Golpe duplo");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Golpeduplo" align="top" height="16" text="Golpe duplo" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Golpeduplo" align="client" text="sempre que o portador da arma/canalizador com este encantamento tirar crítico positivo no acerto, ganhará o direito de rolar um segundo ataque contra " fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Golpeduplo" align="client" text="sempre que o portador da arma/canalizador com este encantamento tirar crítico positivo no acerto, ganhará o direito de rolar um segundo ataque contra o mesmo oponente." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Guerreiroarcano" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
                                 <event name="onClick"><![CDATA[alternarEncantamento("Guerreiro arcano");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Guerreiroarcano" align="top" height="16" text="Guerreiro arcano" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Guerreiroarcano" align="client" text="escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +2 de acerto ou" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Guerreiroarcano" align="client" text="escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +2 de acerto ou +10 de dano/escudo/cura; Escolha durante fabricação" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Incorporacaomelhorada" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
@@ -29753,21 +29892,21 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Artefato arcano");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Artefatoarcano" align="top" height="16" text="Artefato arcano" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Artefatoarcano" align="client" text="permite que um pergaminho de habilidades seja absorvido pelo objeto com este encantamento, e dará ao portador a capacidade de usar a habilidade por" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Artefatoarcano" align="client" text="permite que um pergaminho de habilidades seja absorvido pelo objeto com este encantamento, e dará ao portador a capacidade de usar a habilidade por uma estação, com o gasto de aura/mana." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Contragolpe" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
                                 <event name="onClick"><![CDATA[alternarEncantamento("Contragolpe");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Contragolpe" align="top" height="16" text="Contragolpe" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Contragolpe" align="client" text="dá ao portador do escudo/armadura/arma/canalizador com este encantamento a chance de gastar uma reação por combate, por inimigo, para atacar o mesmo c" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Contragolpe" align="client" text="dá ao portador do escudo/armadura/arma/canalizador com este encantamento a chance de gastar uma reação por combate, por inimigo, para atacar o mesmo caso o portador seja atacado." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Dominiodaleitura" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
                                 <event name="onClick"><![CDATA[alternarEncantamento("Domínio da leitura");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Dominiodaleitura" align="top" height="16" text="Domínio da leitura" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Dominiodaleitura" align="client" text="acessórios com este encantamento dão ao portador capacidade de ler e escrever sem a necessidade da perícia &quot;Acadêmicos&quot;, desde que seja um idioma que " fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Dominiodaleitura" align="client" text="acessórios com este encantamento dão ao portador capacidade de ler e escrever sem a necessidade da perícia &quot;Acadêmicos&quot;, desde que seja um idioma que ele conheça." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Figadodemendigo" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
@@ -29781,14 +29920,14 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Golpe arcano");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Golpearcano" align="top" height="16" text="Golpe arcano" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Golpearcano" align="client" text="aumenta o passo de dano da arma em 1. Em canalizadores energéticos, apenas funciona com habilidades ou feitiços de" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Golpearcano" align="client" text="aumenta o passo de dano da arma em 1. Em canalizadores energéticos, apenas funciona com habilidades ou feitiços de dano." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_Heroiarcano" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
                                 <event name="onClick"><![CDATA[alternarEncantamento("Herói arcano");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Heroiarcano" align="top" height="16" text="Herói arcano" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Heroiarcano" align="client" text="escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +3 de acerto ou" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Heroiarcano" align="client" text="escolha um poder ativo, e toda vez que o portador usar uma habilidade de tal poder receberá +3 de acerto ou +15 de dano/escudo/cura; Escolha durante fabricação" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_IncorporacaoTotal" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
@@ -29802,7 +29941,7 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Nemesis");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Nemesis" align="top" height="16" text="Nemesis" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Nemesis" align="client" text="durante o encantamento de uma armadura ou escudo, o portador escolhe um tipo de [" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Nemesis" align="client" text="durante o encantamento de uma armadura ou escudo, o portador escolhe um tipo de [Criatura], que se tornará o Nemesis do objeto, e toda vez que enfrentar tais criaturas receberá +3 em todas as suas defesas." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                             <rectangle name="rectEnc_RemoverEncantamentoIII" align="top" height="40" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="4" yradius="4" margins="{bottom=4}" cursor="handPoint" hint="Aplicar ou remover este encantamento">
@@ -29823,7 +29962,7 @@
                                 <event name="onClick"><![CDATA[alternarEncantamento("Tesouro do aventureiro");]]></event>
                                 <layout align="client" margins="{left=10,right=10,top=3,bottom=3}">
                                     <label name="lblEnc_Tesourodoaventureiro" align="top" height="16" text="Tesouro do aventureiro" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" wordWrap="false" hitTest="false"/>
-                                    <label name="descEnc_Tesourodoaventureiro" align="client" text="permite ao portador do objeto com este encantamento rolar todos os seus testes de" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
+                                    <label name="descEnc_Tesourodoaventureiro" align="client" text="permite ao portador do objeto com este encantamento rolar todos os seus testes de loot com vantagem, e escolher o resultado que preferir." fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" wordWrap="true" hitTest="false"/>
                                 </layout>
                             </rectangle>
                     </scrollBox>
@@ -29834,15 +29973,150 @@
 
     <popup name="popEncantamentoPersonalizado" width="640" height="540" backOpacity="0.82" cancelable="true">
         <rectangle align="client" color="#070A0C" strokeColor="#8A63C9" strokeSize="2" xradius="6" yradius="6" hitTest="false">
-            <layout align="client" margins="{left=20,right=20,top=16,bottom=16}">
+            <!-- TELA 1: CATALOGO DE SLOTS DO ITEM -->
+            <layout name="popEncCustom_viewCatalogo" align="client" margins="{left=20,right=20,top=16,bottom=16}" visible="true">
+                <label align="top" height="26" text="ENCANTAMENTOS PERSONALIZADOS" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" horzTextAlign="center" hitTest="false"/>
+                <label name="popEncCustom_lblSubtituloCatalogo" align="top" height="18" text="ESCOLHA UM SLOT PARA CADASTRAR OU EDITAR" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="center" hitTest="false"/>
+                <rectangle align="top" height="1" color="#8A63C9" margins="{top=4,bottom=8}" hitTest="false"/>
+                <layout align="bottom" height="36">
+                    <rectangle align="client" color="#12181C" strokeColor="#3A4750" strokeSize="1" xradius="3" yradius="3" cursor="handPoint">
+                        <event name="onClick"><![CDATA[fecharPopupEncantamentoPersonalizado();]]></event>
+                        <label align="client" text="FECHAR" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/>
+                    </rectangle>
+                </layout>
+                <scrollBox name="popEncCustom_scrollCatalogo" align="client" margins="{bottom=8}">
+                    <layout name="popEncCustom_wrapCard1" align="top" height="46">
+                        <rectangle name="popEncCustom_card1" align="client" color="#0D1317" strokeColor="#22323A" strokeSize="1" xradius="4" yradius="4" margins="{bottom=6}" cursor="handPoint">
+                            <event name="onClick"><![CDATA[selecionarRegistroEncCustom(1);]]></event>
+                            <layout align="left" width="110" margins="{left=10,right=6}">
+                                <label name="popEncCustom_cardBadge1" align="client" text="REGISTRO 1" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="right" width="90" margins="{right=10}">
+                                <label name="popEncCustom_cardAcao1" align="client" text="EDITAR" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="trailing" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="client" margins="{left=4,right=6}">
+                                <label name="popEncCustom_cardNome1" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                                <label name="popEncCustom_cardDetalhe1" align="client" text="" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" vertTextAlign="leading" wordWrap="false" hitTest="false"/>
+                            </layout>
+                        </rectangle>
+                    </layout>
+                    <layout name="popEncCustom_wrapCard2" align="top" height="46">
+                        <rectangle name="popEncCustom_card2" align="client" color="#0D1317" strokeColor="#22323A" strokeSize="1" xradius="4" yradius="4" margins="{bottom=6}" cursor="handPoint">
+                            <event name="onClick"><![CDATA[selecionarRegistroEncCustom(2);]]></event>
+                            <layout align="left" width="110" margins="{left=10,right=6}">
+                                <label name="popEncCustom_cardBadge2" align="client" text="REGISTRO 2" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="right" width="90" margins="{right=10}">
+                                <label name="popEncCustom_cardAcao2" align="client" text="EDITAR" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="trailing" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="client" margins="{left=4,right=6}">
+                                <label name="popEncCustom_cardNome2" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                                <label name="popEncCustom_cardDetalhe2" align="client" text="" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" vertTextAlign="leading" wordWrap="false" hitTest="false"/>
+                            </layout>
+                        </rectangle>
+                    </layout>
+                    <layout name="popEncCustom_wrapCard3" align="top" height="46">
+                        <rectangle name="popEncCustom_card3" align="client" color="#0D1317" strokeColor="#22323A" strokeSize="1" xradius="4" yradius="4" margins="{bottom=6}" cursor="handPoint">
+                            <event name="onClick"><![CDATA[selecionarRegistroEncCustom(3);]]></event>
+                            <layout align="left" width="110" margins="{left=10,right=6}">
+                                <label name="popEncCustom_cardBadge3" align="client" text="REGISTRO 3" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="right" width="90" margins="{right=10}">
+                                <label name="popEncCustom_cardAcao3" align="client" text="EDITAR" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="trailing" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="client" margins="{left=4,right=6}">
+                                <label name="popEncCustom_cardNome3" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                                <label name="popEncCustom_cardDetalhe3" align="client" text="" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" vertTextAlign="leading" wordWrap="false" hitTest="false"/>
+                            </layout>
+                        </rectangle>
+                    </layout>
+                    <layout name="popEncCustom_wrapCard4" align="top" height="46">
+                        <rectangle name="popEncCustom_card4" align="client" color="#0D1317" strokeColor="#22323A" strokeSize="1" xradius="4" yradius="4" margins="{bottom=6}" cursor="handPoint">
+                            <event name="onClick"><![CDATA[selecionarRegistroEncCustom(4);]]></event>
+                            <layout align="left" width="110" margins="{left=10,right=6}">
+                                <label name="popEncCustom_cardBadge4" align="client" text="REGISTRO 4" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="right" width="90" margins="{right=10}">
+                                <label name="popEncCustom_cardAcao4" align="client" text="EDITAR" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="trailing" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="client" margins="{left=4,right=6}">
+                                <label name="popEncCustom_cardNome4" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                                <label name="popEncCustom_cardDetalhe4" align="client" text="" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" vertTextAlign="leading" wordWrap="false" hitTest="false"/>
+                            </layout>
+                        </rectangle>
+                    </layout>
+                    <layout name="popEncCustom_wrapCard5" align="top" height="46">
+                        <rectangle name="popEncCustom_card5" align="client" color="#0D1317" strokeColor="#22323A" strokeSize="1" xradius="4" yradius="4" margins="{bottom=6}" cursor="handPoint">
+                            <event name="onClick"><![CDATA[selecionarRegistroEncCustom(5);]]></event>
+                            <layout align="left" width="110" margins="{left=10,right=6}">
+                                <label name="popEncCustom_cardBadge5" align="client" text="REGISTRO 5" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="right" width="90" margins="{right=10}">
+                                <label name="popEncCustom_cardAcao5" align="client" text="EDITAR" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="trailing" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="client" margins="{left=4,right=6}">
+                                <label name="popEncCustom_cardNome5" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                                <label name="popEncCustom_cardDetalhe5" align="client" text="" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" vertTextAlign="leading" wordWrap="false" hitTest="false"/>
+                            </layout>
+                        </rectangle>
+                    </layout>
+                    <layout name="popEncCustom_wrapCard6" align="top" height="46">
+                        <rectangle name="popEncCustom_card6" align="client" color="#0D1317" strokeColor="#22323A" strokeSize="1" xradius="4" yradius="4" margins="{bottom=6}" cursor="handPoint">
+                            <event name="onClick"><![CDATA[selecionarRegistroEncCustom(6);]]></event>
+                            <layout align="left" width="110" margins="{left=10,right=6}">
+                                <label name="popEncCustom_cardBadge6" align="client" text="REGISTRO 6" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="right" width="90" margins="{right=10}">
+                                <label name="popEncCustom_cardAcao6" align="client" text="EDITAR" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="trailing" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="client" margins="{left=4,right=6}">
+                                <label name="popEncCustom_cardNome6" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                                <label name="popEncCustom_cardDetalhe6" align="client" text="" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" vertTextAlign="leading" wordWrap="false" hitTest="false"/>
+                            </layout>
+                        </rectangle>
+                    </layout>
+                    <layout name="popEncCustom_wrapCard7" align="top" height="46">
+                        <rectangle name="popEncCustom_card7" align="client" color="#0D1317" strokeColor="#22323A" strokeSize="1" xradius="4" yradius="4" margins="{bottom=6}" cursor="handPoint">
+                            <event name="onClick"><![CDATA[selecionarRegistroEncCustom(7);]]></event>
+                            <layout align="left" width="110" margins="{left=10,right=6}">
+                                <label name="popEncCustom_cardBadge7" align="client" text="REGISTRO 7" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="right" width="90" margins="{right=10}">
+                                <label name="popEncCustom_cardAcao7" align="client" text="EDITAR" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="trailing" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="client" margins="{left=4,right=6}">
+                                <label name="popEncCustom_cardNome7" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                                <label name="popEncCustom_cardDetalhe7" align="client" text="" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" vertTextAlign="leading" wordWrap="false" hitTest="false"/>
+                            </layout>
+                        </rectangle>
+                    </layout>
+                    <layout name="popEncCustom_wrapCard8" align="top" height="46">
+                        <rectangle name="popEncCustom_card8" align="client" color="#0D1317" strokeColor="#22323A" strokeSize="1" xradius="4" yradius="4" margins="{bottom=6}" cursor="handPoint">
+                            <event name="onClick"><![CDATA[selecionarRegistroEncCustom(8);]]></event>
+                            <layout align="left" width="110" margins="{left=10,right=6}">
+                                <label name="popEncCustom_cardBadge8" align="client" text="REGISTRO 8" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="right" width="90" margins="{right=10}">
+                                <label name="popEncCustom_cardAcao8" align="client" text="EDITAR" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="trailing" vertTextAlign="center" hitTest="false"/>
+                            </layout>
+                            <layout align="client" margins="{left=4,right=6}">
+                                <label name="popEncCustom_cardNome8" align="top" height="18" text="" fontFamily="Cinzel" fontColor="#E6E9E4" fontSize="11" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                                <label name="popEncCustom_cardDetalhe8" align="client" text="" fontFamily="EB Garamond" fontColor="#8C9AA0" fontSize="11" vertTextAlign="leading" wordWrap="false" hitTest="false"/>
+                            </layout>
+                        </rectangle>
+                    </layout>
+                </scrollBox>
+            </layout>
+
+            <!-- TELA 2: FORMULARIO DE EDICAO DO SLOT SELECIONADO -->
+            <layout name="popEncCustom_viewEditor" align="client" margins="{left=20,right=20,top=16,bottom=16}" visible="false">
                 <label align="top" height="26" text="ENCANTAMENTO PERSONALIZADO" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" horzTextAlign="center" hitTest="false"/>
                 <label name="popEncCustom_lblSlot" align="top" height="18" text="REGISTRO 1 DE 3" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="center" hitTest="false"/>
                 <rectangle align="top" height="1" color="#8A63C9" margins="{top=4,bottom=8}" hitTest="false"/>
-                <layout align="top" height="34" margins="{bottom=8}">
-                    <rectangle name="popEncCustom_btn1" align="left" width="180" color="#12181C" strokeColor="#C9A24B" strokeSize="2" xradius="3" yradius="3" margins="{right=8}" cursor="handPoint"><event name="onClick"><![CDATA[selecionarRegistroEncCustom(1);]]></event><label name="popEncCustom_lbl1" align="client" text="REGISTRO 1" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/></rectangle>
-                    <rectangle name="popEncCustom_btn2" align="left" width="180" color="#12181C" strokeColor="#22323A" strokeSize="1" xradius="3" yradius="3" margins="{right=8}" cursor="handPoint"><event name="onClick"><![CDATA[selecionarRegistroEncCustom(2);]]></event><label name="popEncCustom_lbl2" align="client" text="REGISTRO 2" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/></rectangle>
-                    <rectangle name="popEncCustom_btn3" align="client" color="#12181C" strokeColor="#22323A" strokeSize="1" xradius="3" yradius="3" cursor="handPoint"><event name="onClick"><![CDATA[selecionarRegistroEncCustom(3);]]></event><label name="popEncCustom_lbl3" align="client" text="REGISTRO 3" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/></rectangle>
-                </layout>
+                <rectangle name="popEncCustom_btnVoltarCatalogo" align="top" height="32" color="#12181C" strokeColor="#8A63C9" strokeSize="1" xradius="4" yradius="4" margins="{bottom=10}" cursor="handPoint" hint="Ver todos os slots de encantamento do item">
+                    <event name="onClick"><![CDATA[mostrarCatalogoEncCustom();]]></event>
+                    <label name="popEncCustom_lblBtnVoltar" align="client" text="ESCOLHER OUTRO SLOT (REGISTRO 1 DE 3)" fontFamily="Marcellus SC" fontColor="#8A63C9" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/>
+                </rectangle>
                 <label align="top" height="16" text="NOME" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" hitTest="false"/>
                 <rectangle align="top" height="34" color="#0D1317" strokeColor="#22323A" strokeSize="1" xradius="3" yradius="3" margins="{bottom=8}"><edit name="popEncCustom_nome" align="client" fontFamily="EB Garamond" fontColor="#E6E9E4" fontSize="13" transparent="true" margins="{left=8,right=8}"/></rectangle>
                 <layout align="top" height="58" margins="{bottom=8}">
@@ -29851,11 +30125,11 @@
                 </layout>
                 <label align="top" height="16" text="EFEITO VALIDADO PELO MESTRE" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" hitTest="false"/>
                 <layout align="bottom" height="36">
-                    <rectangle align="left" width="150" color="#12181C" strokeColor="#3A4750" strokeSize="1" xradius="3" yradius="3" margins="{right=8}" cursor="handPoint"><event name="onClick"><![CDATA[fecharPopupEncantamentoPersonalizado();]]></event><label align="client" text="CANCELAR" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/></rectangle>
+                    <rectangle align="left" width="150" color="#12181C" strokeColor="#3A4750" strokeSize="1" xradius="3" yradius="3" margins="{right=8}" cursor="handPoint"><event name="onClick"><![CDATA[mostrarCatalogoEncCustom();]]></event><label align="client" text="VOLTAR AOS SLOTS" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/></rectangle>
                     <rectangle align="left" width="150" color="#170D10" strokeColor="#8B2332" strokeSize="1" xradius="3" yradius="3" margins="{right=8}" cursor="handPoint"><event name="onClick"><![CDATA[removerEncantamentoPersonalizado();]]></event><label align="client" text="REMOVER REGISTRO" fontFamily="Marcellus SC" fontColor="#9E3B4A" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/></rectangle>
                     <rectangle align="client" color="#12181C" strokeColor="#C9A24B" strokeSize="1" xradius="3" yradius="3" cursor="handPoint"><event name="onClick"><![CDATA[salvarEncantamentoPersonalizado();]]></event><label align="client" text="SALVAR E APLICAR" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/></rectangle>
                 </layout>
-                <rectangle align="client" color="#0D1317" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=10}"><edit name="popEncCustom_efeito" align="client" fontFamily="EB Garamond" fontColor="#E6E9E4" fontSize="13" transparent="true" wordWrap="true" margins="{left=10,right=10,top=8,bottom=8}" hint="Descreva o efeito completo. Efeitos personalizados são resolvidos manualmente pela mesa."/></rectangle>
+                <rectangle align="client" color="#0D1317" strokeColor="#3A2E52" strokeSize="1" xradius="3" yradius="3" margins="{bottom=10}"><textEditor name="popEncCustom_efeito" align="client" fontFamily="EB Garamond" fontColor="#E6E9E4" fontSize="13" transparent="true" margins="{left=10,right=10,top=8,bottom=8}" hint="Descreva o efeito completo. Efeitos personalizados são resolvidos manualmente pela mesa."/></rectangle>
             </layout>
         </rectangle>
     </popup>

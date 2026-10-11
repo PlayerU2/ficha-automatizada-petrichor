@@ -1,4 +1,8 @@
-FICHA DE PERSONAGEM - PETRICHOR - v0.53.35
+FICHA DE PERSONAGEM - PETRICHOR - v0.53.36
+
+NOVIDADE v0.53.36: o registro de slots para encantamentos personalizados agora
+conta com catalogo visual de slots e editor integrado com campo multilinha,
+eliminando o aperto horizontal e facilitando a edicao de ate 8 slots por item.
 
 ARTE v0.53.28: o brasao racial dos Humanos foi substituido pela nova versao
 com maos erguidas, ramos e simbolo divino. A arte foi limpa e ajustada para

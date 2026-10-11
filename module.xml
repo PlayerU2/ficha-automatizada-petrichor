@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module sdkVersion="3.7b">
-    <version>0.53.35</version>
+    <version>0.53.36</version>
     <info lang="pt-BR">
         <name>Petrichor - Ficha de Personagem</name>
         <description>Ficha de personagem automatizada para o sistema homebrew de Petrichor (d20, semideuses, Aura/Mana, Qualidades &amp; Defeitos).</description>
