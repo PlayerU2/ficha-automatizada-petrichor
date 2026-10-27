@@ -623,6 +623,15 @@
         function reconciliarRecursosAtuais()
             if sheet == nil then return end
             local primeiraVez = (tostring(sheet.recursosAtuaisIniciados or "") ~= "1")
+            -- Ao adquirir Coração de Mana numa ficha já em uso, levar os
+            -- pontos de Aura que RESTAM, não a capacidade inteira. O laço
+            -- abaixo soma ao atual a mudança dos máximos; compensar aqui a
+            -- parcela gasta impede que a conversão cure energia de graça.
+            if not primeiraVez and temQualidadeNaFicha("Coração de mana")
+               and not personagemEhBruxa() and n(sheet.ap) == 0
+               and n(sheet.apMaxAnterior) > 0 then
+                sheet.mpAtual = n(sheet.mpAtual) + n(sheet.apAtual) - n(sheet.apMaxAnterior)
+            end
             -- Qual barra o detector de golpe observa: a mesma que o Ferido
             -- mede. No vampiro e o Vitae.
             local barraDoFerido = sheet.ehVampiro and "pv" or "hp"
@@ -732,7 +741,8 @@
         -- porque o catalogo so guardava o percentual de TOTAL. O segundo
         -- efeito esta na MESMA FRASE do livro: "Vigor expandido" e "Vigor
         -- reprimido" mudam o ganho de VIDA por descanso, e "Aura expandida"
-        -- muda o da AURA ("desta energia" - nao vale para a mana).
+        -- muda o da AURA. Para quem tem Coração de mana sem Unaris, a mesa
+        -- transfere essa reserva e seus efeitos para Mana (27/10/2026).
         --
         -- DECISOES DA MESA, 06/09/2026:
         --
@@ -823,11 +833,15 @@
                 local ganho = ganhoDescanso(sheet.hp, percentVidaDescanso(tipo),
                                             ef.descansoHpPercent or 0)
                 sheet.hpAtual = n(sheet.hpAtual) + ganho
-                sheet.apAtual = n(sheet.apAtual) +
-                    ganhoDescanso(sheet.ap, d.energia, ef.descansoApPercent or 0)
+                local soMana = temQualidadeNaFicha("Coração de mana") and not personagemEhBruxa()
+                if not soMana then
+                    sheet.apAtual = n(sheet.apAtual) +
+                        ganhoDescanso(sheet.ap, d.energia, ef.descansoApPercent or 0)
+                end
                 if sheet.temCoracaoDeMana then
                     sheet.mpAtual = n(sheet.mpAtual) +
-                        ganhoDescanso(sheet.mp, d.energia, 0)
+                        ganhoDescanso(sheet.mp, d.energia,
+                            soMana and (ef.descansoApPercent or 0) or 0)
                 end
                 if personagemEhBruxa() then
                     sheet.pranaAtual = n(sheet.pranaAtual) +
@@ -1000,10 +1014,9 @@
                 ajusteManual = sheet.ajusteHp,
                 constituicaoSobrenatural = nivelDoPoder("Constituição sobrenatural"),
             })
-            -- Vigor expandido/reprimido incide na VIDA, sempre - inclusive
-            -- em vampiro. Aura expandida/reprimida incide na AURA, sempre -
-            -- inclusive em bruxa. Cada qualidade age na barra que ela nomeia,
-            -- e nao na barra derivada (Prana e Vitae ficam de fora).
+            -- Vigor expandido/reprimido incide na Vida. A reserva ampliada
+            -- por Aura expandida vai para Mana quando há Coração de mana
+            -- (decisão da mesa, 27/10/2026).
             sheet.hp = math.floor(hpBase * (1 + (efeitosQD.hpPercent or 0) / 100) + 0.5)
 
             -- A conta do Hp, com as MESMAS parcelas de Calculos.hp e das
@@ -1103,10 +1116,25 @@
                 CONTAS.Ap = contaAp
             end
 
+            -- Mesa, 27/10/2026: Coração de Mana substitui a reserva de Aura
+            -- pela Mana. A reserva inteira (base, dados, ajuste e percentual
+            -- de Aura expandida) muda de destino; o campo legado continua
+            -- gravado para a conta se recompor ao retirar a qualidade.
+            if temQualidadeNaFicha("Coração de mana") and not personagemEhBruxa() then
+                local baseMana = n(sheet.mp)
+                local auraTransferida = n(sheet.ap)
+                sheet.mp = baseMana + auraTransferida
+                sheet.ap = 0
+                CONTAS.MpDetalhada = CONTAS.Mp .. " + Aura convertida (" .. CONTAS.Ap ..
+                    ") = " .. n(sheet.mp)
+                CONTAS.Mp = "mana " .. baseMana .. " + aura transferida " .. auraTransferida
+            else
+                CONTAS.MpDetalhada = nil
+            end
+
             -- PRANA: a barra da BRUXA (Linhagem de Unaris), soma de Mana e
-            -- Aura. Mana e Aura seguem calculadas normalmente - o Prana e uma
-            -- TERCEIRA barra, e nao uma fusao que apaga as outras. Mago com
-            -- Coracao de Mana nao tem Prana: ele tem Mana e Aura separadas.
+            -- Aura. A mesa confirmou que ela não acumula Coração de mana:
+            -- são caminhos diferentes. O mago comum usa só Mana.
             -- O Prana e a soma das duas barras JA calculadas. Como Aura
             -- expandida ja entrou na Aura, o efeito chega aqui por
             -- consequencia - nao se aplica de novo.
@@ -11783,8 +11811,8 @@
         -- Os cards de cada linha dividem a largura disponivel em partes
         -- iguais. Sem isso, largura fixa deixava um vao a direita em tela
         -- larga e apertava em tela estreita.
-        -- Cards ocultos (Mana sem Coração de mana, Prana sem bruxa, Vitae sem
-        -- vampiro) ficam com largura 0 e nao entram na divisao - os visiveis
+        -- Cards ocultos (Aura com Coração de mana, Mana sem magia, Prana sem
+        -- bruxa, Vitae sem vampiro) ficam com largura 0 - os visiveis
         -- se espalham para ocupar a linha inteira.
         --
         -- Roda no onResize do scrollBox e ao fim de cada recalculo.
@@ -11859,7 +11887,8 @@
                 -- (medido em 06/09/2026: tres sitios, todos aqui).
                 return sheet.ehVampiro ~= true
             elseif nome == "Ap" then
-                return sheet.ehVampiro ~= true
+                return sheet.ehVampiro ~= true and
+                    not (temQualidadeNaFicha("Coração de mana") and not personagemEhBruxa())
             elseif nome == "Lua" then
                 -- Fase da lua: so a tribo dos VIGILANTES usa o ciclo lunar.
                 -- Para o Filho da Furia o card nao alimentaria nada, e card
@@ -12195,11 +12224,11 @@
                     if personagemEhBruxa() then
                         table.insert(partes, "+" ..
                             ganhoDescanso(sheet.prana, d.energia, pctA) .. " prana")
+                    elseif temQualidadeNaFicha("Coração de mana") then
+                        table.insert(partes, "+" ..
+                            ganhoDescanso(sheet.mp, d.energia, pctA) .. " mana")
                     else
                         table.insert(partes, "+" .. ganhoDescanso(sheet.ap, d.energia, pctA) .. " aura")
-                        if sheet.temCoracaoDeMana then
-                            table.insert(partes, "+" .. ganhoDescanso(sheet.mp, d.energia, 0) .. " mana")
-                        end
                     end
                     return d.rotulo:lower() .. " " .. d.horas .. "h: " .. table.concat(partes, " · ")
                 end
@@ -12213,14 +12242,21 @@
                 end
             end
 
-            -- A Aura e SEMPRE calculada e nunca zera: todo ser vivo tem
-            -- Aura. O que muda entre magos, bruxas e vampiros e de qual
-            -- barra a energia e gasta.
+            -- A Aura é zero no mago comum: a reserva foi para a Mana.
+            -- Na bruxa e nos demais personagens ela mantém a regra própria.
             porRecurso("Ap", "ap")
             porTexto("Ap", CONTAS.Ap)
 
             porRecurso("Mp", "mp")
             porTexto("Mp", CONTAS.Mp)
+            if self.cmb_contaMp ~= nil then
+                self.cmb_contaMp:setHint(CONTAS.MpDetalhada or CONTAS.Mp)
+            end
+            if self.cmb_lblAcumuladoEnergia ~= nil then
+                self.cmb_lblAcumuladoEnergia:setText(
+                    temQualidadeNaFicha("Coração de mana") and not ehBruxa and
+                    "Mana acumulada por nível" or "Aura acumulada por nível")
+            end
 
             -- PRANA: so a bruxa tem. E a soma das outras duas barras.
             porRecurso("Prana", "prana")
@@ -12255,7 +12291,7 @@
                 elseif ehBruxa then
                     self.cmb_lblNotaRecursos:setText("Linhagem de Unaris: você gasta do PRANA, que é a soma da sua Mana com a sua Aura. As duas seguem calculadas em separado.")
                 elseif sheet.temCoracaoDeMana then
-                    self.cmb_lblNotaRecursos:setText("Coração de Mana: você tem Mana e Aura, cada uma com sua barra.")
+                    self.cmb_lblNotaRecursos:setText("Coração de Mana: a reserva de Aura, seus dados por nível e seus bônus entram na Mana.")
                 else
                     self.cmb_lblNotaRecursos:setText("")
                 end
@@ -16334,7 +16370,7 @@
                          O numero e ESCRITO A MAO aqui e conferido pela
                          checagem 27 contra o module.xml - se alguem esquecer
                          de subir um dos dois, o build para. -->
-                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.38" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
+                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.39" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
                     <label name="lblSecaoAtual" align="client" text="SEÇÃO 01  •  DADOS PESSOAIS" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="12" vertTextAlign="center" margins="{left=8}"/>
                 </layout>
 
@@ -17263,7 +17299,7 @@
                             <rectangle align="top" height="3" color="#7FA8B8" hitTest="false"/>
                             <layout align="top" height="26" margins="{top=4}">
                                 <image align="none" left="4" top="2" width="22" height="22" style="originalSize" src="imagens/combate_mana.png" hitTest="false"/>
-                                <label align="client" text="PONTOS DE MANA" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" horzTextAlign="center" vertTextAlign="center" hint="15 + base por idade + (Nível × 2). Exige a qualidade Coração de mana."/>
+                                <label align="client" text="PONTOS DE MANA" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" horzTextAlign="center" vertTextAlign="center" hint="15 + base por idade + (Nível × 2). Com Coração de mana, a reserva de Aura e seus bônus também entram aqui."/>
                             </layout>
                             <layout align="top" height="34" margins="{left=8,right=8}">
                                 <layout name="cmb_vaoAtualMp" align="left" width="0"/>
@@ -17454,9 +17490,9 @@
                             </rectangle>
                         </layout>
                         <layout name="cmb_compAuraNivel" align="left" width="220" margins="{right=12}">
-                            <label align="top" height="15" text="Aura acumulada por nível" fontFamily="EB Garamond" fontColor="#54636B" fontSize="11" hitTest="false"/>
+                            <label name="cmb_lblAcumuladoEnergia" align="top" height="15" text="Aura acumulada por nível" fontFamily="EB Garamond" fontColor="#54636B" fontSize="11" hitTest="false"/>
                             <rectangle align="client" color="#080B0E" strokeColor="#1E2A31" strokeSize="1" xradius="3" yradius="3">
-                                <edit align="client" field="dadoPorNivelAcumulado" type="number" text="0" fontFamily="EB Garamond" fontColor="#E6E9E4" fontSize="13" horzTextAlign="center" transparent="true" hint="Soma dos dados de Aura rolados a cada nível.">
+                                <edit align="client" field="dadoPorNivelAcumulado" type="number" text="0" fontFamily="EB Garamond" fontColor="#E6E9E4" fontSize="13" horzTextAlign="center" transparent="true" hint="Dados acumulados por nível: somam à Aura; com Coração de mana, somam à Mana.">
                                     <event name="onChange"><![CDATA[recalcularTudo();]]></event>
                                 </edit>
                             </rectangle>

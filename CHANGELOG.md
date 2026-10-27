@@ -1,3 +1,9 @@
+## v0.53.39
+
+- Coração de mana usa uma única reserva de Mana: recebe a capacidade antes calculada como Aura, os dados acumulados, ajustes e efeitos de Aura expandida.
+- O card de Aura some e o de Mana mostra a soma; o descanso recupera a Mana ampliada. Fichas em uso transferem os pontos de Aura que ainda restam.
+- Linhagem de Unaris preserva a regra própria do Prana.
+
 ## v0.53.38
 
 - A aba Qualidades & Defeitos rola como uma página única; as duas listas crescem conforme o número de registros, eliminando as barras internas e os itens cortados.

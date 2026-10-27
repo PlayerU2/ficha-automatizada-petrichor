@@ -9,7 +9,7 @@ número** — para o jogador conferir sem abrir o livro e o mestre auditar de
 relance.
 
 <p align="center">
-  <img alt="versão" src="https://img.shields.io/badge/versão-0.53.38-C9A24B">
+  <img alt="versão" src="https://img.shields.io/badge/versão-0.53.39-C9A24B">
   <img alt="Firecast SDK" src="https://img.shields.io/badge/Firecast%20SDK-3.7b-8A63C9">
   <img alt="Lua" src="https://img.shields.io/badge/Lua-5.3-000080">
 </p>

@@ -65,12 +65,12 @@ CatalogoQD.itens = {
         efeitos = {
             -- "Possui 15% a mais do valor total de Aura; recupere 25% MAIS
             -- desta energia por descanso curto ou longo" [2.2]. Sao DOIS
-            -- efeitos na mesma frase, e ate a v0.48.0 so o primeiro estava
-            -- modelado. "desta energia" e a AURA: nao vale para a mana.
+            -- efeitos na mesma frase. Mesa 27/10/2026: para Coração de mana,
+            -- ambos são transferidos à Mana; para os demais, ficam na Aura.
             [1] = {apPercent = 15, descansoApPercent = 25},
             [2] = {apPercent = 30, descansoApPercent = 50},
         },
-        automacao = [==[Ajusta automaticamente o total de Aura e a recuperação de Aura nos descansos curto e longo.]==],
+        automacao = [==[Ajusta o total e a recuperação de Aura; com Coração de mana, transfere ambos os benefícios para Mana.]==],
         descricao = [==[Esta força utilizada pelos mortais para realizarem atos extraordinários é maior dentro de você que na maioria. Não só a quantidade total é maior, mas você recupera Aura em um ritmo mais acelerado que os demais. Isso não significa que sua energia é mais poderosa ou de alguma forma especial, somente que você possuí um reservatório maior do que os outros.]==],
         efeito = [==[01 ponto: Possuí 15% a mais do valor total de Aura; recupere 25% mais desta energia por descanso curto ou longo.
 02 pontos: Possui 30% a mais do valor total de Aura; recupere 50% mais desta energia por descanso curto ou longo.]==],
@@ -118,7 +118,7 @@ CatalogoQD.itens = {
         pontosMin = 5,
         pontosMax = 5,
         faixaContinua = false,
-        automacao = [==[Libera automaticamente Mana e o kit de Magia. A ficha também impede a compra de qualquer outro poder ativo, conforme a restrição expressa da qualidade.]==],
+        automacao = [==[Libera Mana e o kit de Magia. A reserva de Aura, os dados por nível e os bônus de Aura expandida passam para Mana; o card de Aura some. Impede outros poderes ativos.]==],
         descricao = [==[Você nasceu com um reservatório de mana que lhe confere a capacidade de utilizar magia. Este dom pode ser obtido de forma hereditária, ou caso um mago tenha realizado o ritual "Passagem" em você, em que o Coração de Mana é passado de mestre para aprendiz. Para jogar como mago esta qualidade é obrigatória, salvo exceção personagens femininos que podem comprar a qualidade "Linhagem de Unaris".]==],
         efeito = [==[Libera a habilidade "Magia" na sua ficha, desbloqueia o uso de Mana.]==],
         restricao = [==[Personagens com esta qualidade ficam impossibilitados de comprar qualquer outro poder ativo que não seja "Magia".]==],

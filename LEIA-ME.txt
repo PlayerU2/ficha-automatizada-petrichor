@@ -1,4 +1,6 @@
-FICHA DE PERSONAGEM - PETRICHOR - v0.53.38
+FICHA DE PERSONAGEM - PETRICHOR - v0.53.39
+
+NOVIDADE v0.53.39: Coração de Mana usa apenas Mana; a reserva e os bônus de Aura migram para ela, inclusive no descanso.
 
 NOVIDADE v0.53.38: As listas de Qualidades e Defeitos crescem conforme os itens; a aba inteira usa uma única barra de rolagem.
 
