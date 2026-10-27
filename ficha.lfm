@@ -623,15 +623,6 @@
         function reconciliarRecursosAtuais()
             if sheet == nil then return end
             local primeiraVez = (tostring(sheet.recursosAtuaisIniciados or "") ~= "1")
-            -- Ao adquirir Coração de Mana numa ficha já em uso, levar os
-            -- pontos de Aura que RESTAM, não a capacidade inteira. O laço
-            -- abaixo soma ao atual a mudança dos máximos; compensar aqui a
-            -- parcela gasta impede que a conversão cure energia de graça.
-            if not primeiraVez and temQualidadeNaFicha("Coração de mana")
-               and not personagemEhBruxa() and n(sheet.ap) == 0
-               and n(sheet.apMaxAnterior) > 0 then
-                sheet.mpAtual = n(sheet.mpAtual) + n(sheet.apAtual) - n(sheet.apMaxAnterior)
-            end
             -- Qual barra o detector de golpe observa: a mesma que o Ferido
             -- mede. No vampiro e o Vitae.
             local barraDoFerido = sheet.ehVampiro and "pv" or "hp"
@@ -1116,18 +1107,26 @@
                 CONTAS.Ap = contaAp
             end
 
-            -- Mesa, 27/10/2026: Coração de Mana substitui a reserva de Aura
-            -- pela Mana. A reserva inteira (base, dados, ajuste e percentual
-            -- de Aura expandida) muda de destino; o campo legado continua
-            -- gravado para a conta se recompor ao retirar a qualidade.
+            -- Mesa, 27/10/2026: Coração de Mana usa SOMENTE a base da Mana.
+            -- A base da Aura (20 + Sab + nível) × rank não entra aqui: somar
+            -- Aura e Mana é exclusivo da Linhagem de Unaris. Os dados por
+            -- nível, o ajuste anterior de Aura e o percentual de qualidades
+            -- passam a modificar a Mana. O campo legado continua gravado.
             if temQualidadeNaFicha("Coração de mana") and not personagemEhBruxa() then
                 local baseMana = n(sheet.mp)
-                local auraTransferida = n(sheet.ap)
-                sheet.mp = baseMana + auraTransferida
+                local dados = n(sheet.dadoPorNivelAcumulado)
+                local ajusteAura = n(sheet.ajusteAp)
+                local antesPercentual = baseMana + dados + ajusteAura
+                local percentual = efeitosQD.apPercent or 0
+                sheet.mp = math.floor(antesPercentual * (1 + percentual / 100) + 0.5)
                 sheet.ap = 0
-                CONTAS.MpDetalhada = CONTAS.Mp .. " + Aura convertida (" .. CONTAS.Ap ..
-                    ") = " .. n(sheet.mp)
-                CONTAS.Mp = "mana " .. baseMana .. " + aura transferida " .. auraTransferida
+                local ganhoQualidade = n(sheet.mp) - antesPercentual
+                local rotuloQualidade = percentual >= 0 and "Aura expandida" or "Aura reprimida"
+                CONTAS.MpDetalhada = CONTAS.Mp .. parcela(dados, "dados por nível") ..
+                    parcela(ajusteAura, "ajuste anterior de Aura") ..
+                    parcela(ganhoQualidade, rotuloQualidade) .. " = " .. n(sheet.mp)
+                CONTAS.Mp = "mana " .. baseMana .. parcela(dados, "dados") ..
+                    parcela(ajusteAura, "ajuste") .. parcela(ganhoQualidade, rotuloQualidade)
             else
                 CONTAS.MpDetalhada = nil
             end
@@ -12291,7 +12290,7 @@
                 elseif ehBruxa then
                     self.cmb_lblNotaRecursos:setText("Linhagem de Unaris: você gasta do PRANA, que é a soma da sua Mana com a sua Aura. As duas seguem calculadas em separado.")
                 elseif sheet.temCoracaoDeMana then
-                    self.cmb_lblNotaRecursos:setText("Coração de Mana: a reserva de Aura, seus dados por nível e seus bônus entram na Mana.")
+                    self.cmb_lblNotaRecursos:setText("Coração de Mana: só a base de Mana conta; dados por nível e bônus antes ligados à Aura favorecem a Mana. A base de Aura não é somada.")
                 else
                     self.cmb_lblNotaRecursos:setText("")
                 end
@@ -16370,7 +16369,7 @@
                          O numero e ESCRITO A MAO aqui e conferido pela
                          checagem 27 contra o module.xml - se alguem esquecer
                          de subir um dos dois, o build para. -->
-                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.39" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
+                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.40" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
                     <label name="lblSecaoAtual" align="client" text="SEÇÃO 01  •  DADOS PESSOAIS" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="12" vertTextAlign="center" margins="{left=8}"/>
                 </layout>
 
@@ -17299,7 +17298,7 @@
                             <rectangle align="top" height="3" color="#7FA8B8" hitTest="false"/>
                             <layout align="top" height="26" margins="{top=4}">
                                 <image align="none" left="4" top="2" width="22" height="22" style="originalSize" src="imagens/combate_mana.png" hitTest="false"/>
-                                <label align="client" text="PONTOS DE MANA" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" horzTextAlign="center" vertTextAlign="center" hint="15 + base por idade + (Nível × 2). Com Coração de mana, a reserva de Aura e seus bônus também entram aqui."/>
+                                <label align="client" text="PONTOS DE MANA" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" horzTextAlign="center" vertTextAlign="center" hint="15 + base por idade + (Nível × 2), dados por nível e bônus aplicáveis. A base de Aura não é somada."/>
                             </layout>
                             <layout align="top" height="34" margins="{left=8,right=8}">
                                 <layout name="cmb_vaoAtualMp" align="left" width="0"/>

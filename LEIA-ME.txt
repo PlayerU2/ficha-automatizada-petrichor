@@ -1,6 +1,8 @@
-FICHA DE PERSONAGEM - PETRICHOR - v0.53.39
+FICHA DE PERSONAGEM - PETRICHOR - v0.53.40
 
-NOVIDADE v0.53.39: Coração de Mana usa apenas Mana; a reserva e os bônus de Aura migram para ela, inclusive no descanso.
+CORREÇÃO v0.53.40: Coração de Mana usa a base pura de Mana. Dados por nível e bônus de Aura favorecem Mana, mas a base de Aura não é somada. Aura expandida também melhora sua recuperação.
+
+HISTÓRICO v0.53.39: Primeira implementação da barra única de Mana; somava indevidamente a base de Aura, erro corrigido na v0.53.40.
 
 NOVIDADE v0.53.38: As listas de Qualidades e Defeitos crescem conforme os itens; a aba inteira usa uma única barra de rolagem.
 

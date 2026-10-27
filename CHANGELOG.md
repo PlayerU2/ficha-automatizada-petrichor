@@ -1,7 +1,13 @@
+## v0.53.40
+
+- Corrige Coração de mana: usa a base pura de Mana, acrescida de dados acumulados por nível, ajuste antes dirigido à Aura e modificadores como Aura expandida. A base de Aura não é somada; só Linhagem de Unaris soma Mana e Aura no Prana.
+- Mantém a barra de Aura oculta para Coração de mana, aplica o bônus de recuperação de Aura expandida à Mana e corrige a explicação da conta no card.
+- Fichas salvas na v0.53.39 têm o máximo e o valor atual da Mana recalculados sem a base de Aura indevida.
+
 ## v0.53.39
 
-- Coração de mana usa uma única reserva de Mana: recebe a capacidade antes calculada como Aura, os dados acumulados, ajustes e efeitos de Aura expandida.
-- O card de Aura some e o de Mana mostra a soma; o descanso recupera a Mana ampliada. Fichas em uso transferem os pontos de Aura que ainda restam.
+- Introduziu uma única barra de Mana para Coração de mana, mas somava por engano a base inteira de Aura. Corrigido na v0.53.40.
+- O card de Aura passou a sumir e o descanso passou a recuperar a Mana ampliada.
 - Linhagem de Unaris preserva a regra própria do Prana.
 
 ## v0.53.38
