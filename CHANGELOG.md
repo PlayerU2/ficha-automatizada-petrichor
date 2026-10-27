@@ -1,3 +1,9 @@
+## v0.53.37
+
+- Linhagem de Gunndana exibe a escolha Primordial/Elemental na aba Qualidades & Defeitos.
+- Manipulação da terra entra no nível 1 quando a qualidade é adquirida, sem custo de pontos; ao remover a qualidade, o nível criado automaticamente sai se não houve compras posteriores.
+- Se o poder já existia, ele é preservado e seu primeiro nível passa a ser gratuito enquanto a qualidade estiver presente.
+
 ## v0.53.34 — auditoria e automações completas de Raças (18/09/2026)
 
 - corrige erros de parsing nos textos do livro (Harpias, Vampiros e Ghiscaris), limpando características fantasmas do catálogo;

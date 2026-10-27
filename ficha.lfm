@@ -894,6 +894,8 @@
             -- caracteristicas, e os bonus precisam entrar e sair junto.
             pcall(function() separarAutomacoesDoBonus() end)
             pcall(function() aplicarConcessoes() end)
+            sincronizarGunndana()
+            atualizarEscolhaGunndana()
 
             -- Hemocinese fica FORA da tabela CONCESSOES porque o nivel
             -- concedido cresce com o nivel do personagem (Orcs: marcos 5, 10,
@@ -6217,6 +6219,61 @@
             return nil
         end
 
+        -- Livro [2.2], Linhagem de Gunndana: "ganhe o poder 'Manipulação da
+        -- Terra' no nível 1". O catálogo usa "Manipulação da terra".
+        -- Uma compra anterior continua intacta; a qualidade paga seu primeiro
+        -- nível enquanto estiver presente, sem gerar pontos livres.
+        function sincronizarGunndana()
+            if sheet == nil then return end
+            local tem = temQualidadeNaFicha("Linhagem de Gunndana")
+            local nome = "Manipulação da terra"
+            local lista = lerPoderes()
+            local item = acharPoder(lista, nome)
+            if tem and item == nil then
+                table.insert(lista, {nome = nome, nivel = 1, log = "",
+                    deus = "Linhagem de Gunndana"})
+                sheet.gunndanaPoderCriado = true
+                gravarPoderes(lista)
+            elseif not tem and sheet.gunndanaPoderCriado == true then
+                -- Remover só o nível que a qualidade criou. Se houve compras
+                -- posteriores, conservar o poder para revisão pelo mestre.
+                if item ~= nil and n(item.nivel) == 1 and tostring(item.log or "") == "" then
+                    for i, p in ipairs(lista) do
+                        if p.nome == nome then table.remove(lista, i); break end
+                    end
+                    gravarPoderes(lista)
+                end
+                sheet.gunndanaPoderCriado = false
+            end
+            if not tem then sheet.gunndanaLinhagem = "" end
+        end
+
+        function atualizarEscolhaGunndana()
+            if sheet == nil or self.qdGunndanaEscolha == nil then return end
+            local tem = temQualidadeNaFicha("Linhagem de Gunndana")
+            self.qdGunndanaEscolha:setHeight(tem and 68 or 0)
+            if not tem then return end
+            local atual = tostring(sheet.gunndanaLinhagem or "")
+            if self.qdGunndanaAviso ~= nil then
+                self.qdGunndanaAviso:setText(atual == "" and
+                    "Escolha uma linhagem para a Boa Fama e o Inimigo." or
+                    "Linhagem " .. atual .. " escolhida. A outra é sua inimiga.")
+            end
+            for _, opcao in ipairs({"Primordial", "Elemental"}) do
+                local btn = self["qdGunndana" .. opcao]
+                if btn ~= nil then btn:setStrokeColor(atual == opcao and COR.gold or COR.line) end
+            end
+        end
+
+        function escolherLinhagemGunndana(nome)
+            if sheet == nil or not temQualidadeNaFicha("Linhagem de Gunndana") then return end
+            if nome ~= "Primordial" and nome ~= "Elemental" then return end
+            if not podeEditarCriacao() then return end
+            sheet.gunndanaLinhagem = nome
+            atualizarEscolhaGunndana()
+            recalcularTudo()
+        end
+
         function nivelDoPoder(nomePoder)
             local p = acharPoder(lerPoderes(), nomePoder)
             if p == nil then return 0 end
@@ -6268,6 +6325,8 @@
                 total = total + n(p.nivel)
                 if p.nome == gratuitoLegado and n(p.nivel) > 0 then total = total - 1 end
                 if p.nome == gratuitoOculto and n(p.nivel) > 0 then total = total - 1 end
+                if p.nome == "Manipulação da terra" and n(p.nivel) > 0
+                   and temQualidadeNaFicha("Linhagem de Gunndana") then total = total - 1 end
             end
             return total
         end
@@ -16261,7 +16320,7 @@
                          O numero e ESCRITO A MAO aqui e conferido pela
                          checagem 27 contra o module.xml - se alguem esquecer
                          de subir um dos dois, o build para. -->
-                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.36" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
+                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.37" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
                     <label name="lblSecaoAtual" align="client" text="SEÇÃO 01  •  DADOS PESSOAIS" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="12" vertTextAlign="center" margins="{left=8}"/>
                 </layout>
 
@@ -17862,6 +17921,22 @@
                          isso aqui o layout quebrou (coluna sumiu, cliques pararam de
                          funcionar). Voltando ao padrao align="left" width=X / "client",
                          que e o testado e confiavel neste container sem scrollBox. -->
+                    <!-- Livro [2.2]: a Linhagem de Gunndana pede a escolha
+                         primordial OU elemental no momento da aquisição. -->
+                    <layout name="qdGunndanaEscolha" align="top" height="0" margins="{bottom=8}">
+                        <label align="top" height="18" text="LINHAGEM DE GUNNDANA — ESCOLHA SUA VERTENTE" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11"/>
+                        <layout align="top" height="28">
+                            <rectangle name="qdGunndanaPrimordial" align="left" width="150" color="#16202A" strokeColor="#22323A" strokeSize="1" cursor="handPoint" margins="{right=8}" hint="Boa Fama entre gigantes primordiais; Inimigo entre elementais">
+                                <event name="onClick"><![CDATA[escolherLinhagemGunndana("Primordial");]]></event>
+                                <label align="client" text="PRIMORDIAL" fontFamily="Marcellus SC" fontSize="11" fontColor="#C9A24B" horzTextAlign="center" vertTextAlign="center" hitTest="false"/>
+                            </rectangle>
+                            <rectangle name="qdGunndanaElemental" align="left" width="150" color="#16202A" strokeColor="#22323A" strokeSize="1" cursor="handPoint" hint="Boa Fama entre gigantes elementais; Inimigo entre primordiais">
+                                <event name="onClick"><![CDATA[escolherLinhagemGunndana("Elemental");]]></event>
+                                <label align="client" text="ELEMENTAL" fontFamily="Marcellus SC" fontSize="11" fontColor="#C9A24B" horzTextAlign="center" vertTextAlign="center" hitTest="false"/>
+                            </rectangle>
+                        </layout>
+                        <label name="qdGunndanaAviso" align="top" height="18" text="Escolha uma linhagem." fontFamily="EB Garamond" fontSize="11" fontColor="#C9A24B"/>
+                    </layout>
                     <layout name="pnlColunasQD" align="client">
                         <event name="onResize"><![CDATA[ajustarColunasQD();]]></event>
                         <layout name="colQualidades" align="left" width="895" margins="{right=6}">

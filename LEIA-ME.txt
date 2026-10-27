@@ -1,4 +1,6 @@
-FICHA DE PERSONAGEM - PETRICHOR - v0.53.36
+FICHA DE PERSONAGEM - PETRICHOR - v0.53.37
+
+NOVIDADE v0.53.37: Linhagem de Gunndana apresenta a escolha Primordial/Elemental e concede Manipulação da terra nível 1 sem gastar pontos.
 
 NOVIDADE v0.53.36: o registro de slots para encantamentos personalizados agora
 conta com catalogo visual de slots e editor integrado com campo multilinha,
