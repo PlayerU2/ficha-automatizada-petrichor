@@ -2541,6 +2541,7 @@
 
         function atualizarPainelPontosQD()
             if sheet == nil then return end
+            ajustarAlturaListasQD()
             local brutoDefeitos = somarPontosLista("listaDefeitos")
             local ganhoDefeitos = math.min(brutoDefeitos, CatalogoQD.MAX_PONTOS_DEFEITOS)
             local disponivel = CatalogoQD.PONTOS_BASE + ganhoDefeitos
@@ -2567,6 +2568,19 @@
                     self.lblPontosSaldo:setFontColor(COR.moss)
                 end
             end
+        end
+
+        -- A aba inteira rola; as duas recordLists mostram todos os seus itens.
+        -- 58 e o itemHeight do XML. As duas colunas compartilham a altura da
+        -- maior lista, evitando um scroll interno e cards cortados.
+        function ajustarAlturaListasQD()
+            if sheet == nil then return end
+            local qtdQ = #(NDB.getChildNodes(sheet.listaQualidades) or {})
+            local qtdD = #(NDB.getChildNodes(sheet.listaDefeitos) or {})
+            local hQ, hD = qtdQ * 58 + 6, qtdD * 58 + 6
+            if self.listaQualidades ~= nil then self.listaQualidades:setHeight(hQ) end
+            if self.listaDefeitos ~= nil then self.listaDefeitos:setHeight(hD) end
+            if self.pnlColunasQD ~= nil then self.pnlColunasQD:setHeight(96 + math.max(hQ, hD)) end
         end
 
         -- Busca o NO real (nao so um boolean) de uma qualidade/defeito ja
@@ -16320,7 +16334,7 @@
                          O numero e ESCRITO A MAO aqui e conferido pela
                          checagem 27 contra o module.xml - se alguem esquecer
                          de subir um dos dois, o build para. -->
-                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.37" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
+                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.38" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
                     <label name="lblSecaoAtual" align="client" text="SEÇÃO 01  •  DADOS PESSOAIS" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="12" vertTextAlign="center" margins="{left=8}"/>
                 </layout>
 
@@ -17881,7 +17895,7 @@
             </layout>
 
             <layout name="pnlAba4" align="client" visible="false" enabled="false">
-                <layout align="client" margins="{left=16,right=16,top=14,bottom=14}">
+                <scrollBox align="client" margins="{left=16,right=16,top=14,bottom=14}">
                     <layout align="top" height="34" margins="{bottom=2}">
                         <label align="left" width="26" text="⚖" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="18" vertTextAlign="center" horzTextAlign="center"/>
                         <label align="client" text="QUALIDADES &amp; DEFEITOS" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="19" fontStyle="bold" vertTextAlign="center" margins="{left=4}"/>
@@ -17916,11 +17930,8 @@
                         </layout>
                     </rectangle>
 
-                    <!-- DUAS COLUNAS. O Grid System (g="row"/g="col") nao deve ser
-                         misturado com atributo align= no mesmo elemento - quando fiz
-                         isso aqui o layout quebrou (coluna sumiu, cliques pararam de
-                         funcionar). Voltando ao padrao align="left" width=X / "client",
-                         que e o testado e confiavel neste container sem scrollBox. -->
+                    <!-- As listas crescem com os registros; a rolagem fica
+                         somente nesta aba, sem barra dentro dos cards. -->
                     <!-- Livro [2.2]: a Linhagem de Gunndana pede a escolha
                          primordial OU elemental no momento da aquisição. -->
                     <layout name="qdGunndanaEscolha" align="top" height="0" margins="{bottom=8}">
@@ -17937,7 +17948,7 @@
                         </layout>
                         <label name="qdGunndanaAviso" align="top" height="18" text="Escolha uma linhagem." fontFamily="EB Garamond" fontSize="11" fontColor="#C9A24B"/>
                     </layout>
-                    <layout name="pnlColunasQD" align="client">
+                    <layout name="pnlColunasQD" align="top" height="102">
                         <event name="onResize"><![CDATA[ajustarColunasQD();]]></event>
                         <layout name="colQualidades" align="left" width="895" margins="{right=6}">
                             <rectangle align="client" color="#0D1317" strokeColor="#8A63C9" strokeSize="1" xradius="5" yradius="5" hitTest="false">
@@ -17951,7 +17962,7 @@
                                         <event name="onClick"><![CDATA[abrirCatalogoQualidades();]]></event>
                                         <label align="client" text="+ ABRIR CATÁLOGO" fontFamily="Marcellus SC" fontColor="#C9A24B" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/>
                                     </rectangle>
-                                    <recordList name="listaQualidades" align="client" field="listaQualidades" templateForm="frmItemQualidadeDefeito" itemHeight="58" selectable="true"/>
+                                    <recordList name="listaQualidades" align="top" height="6" field="listaQualidades" templateForm="frmItemQualidadeDefeito" itemHeight="58" selectable="true"/>
                                 </layout>
                             </rectangle>
                         </layout>
@@ -17967,12 +17978,12 @@
                                         <event name="onClick"><![CDATA[abrirCatalogoDefeitos();]]></event>
                                         <label align="client" text="+ ABRIR CATÁLOGO" fontFamily="Marcellus SC" fontColor="#D4838F" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/>
                                     </rectangle>
-                                    <recordList name="listaDefeitos" align="client" field="listaDefeitos" templateForm="frmItemQualidadeDefeito" itemHeight="58" selectable="true"/>
+                                    <recordList name="listaDefeitos" align="top" height="6" field="listaDefeitos" templateForm="frmItemQualidadeDefeito" itemHeight="58" selectable="true"/>
                                 </layout>
                             </rectangle>
                         </layout>
                     </layout>
-                </layout>
+                </scrollBox>
             </layout>
 
             <layout name="pnlAba5" align="client" visible="false" enabled="false">

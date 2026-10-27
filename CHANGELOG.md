@@ -1,3 +1,7 @@
+## v0.53.38
+
+- A aba Qualidades & Defeitos rola como uma página única; as duas listas crescem conforme o número de registros, eliminando as barras internas e os itens cortados.
+
 ## v0.53.37
 
 - Linhagem de Gunndana exibe a escolha Primordial/Elemental na aba Qualidades & Defeitos.

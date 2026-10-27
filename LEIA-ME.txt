@@ -1,4 +1,6 @@
-FICHA DE PERSONAGEM - PETRICHOR - v0.53.37
+FICHA DE PERSONAGEM - PETRICHOR - v0.53.38
+
+NOVIDADE v0.53.38: As listas de Qualidades e Defeitos crescem conforme os itens; a aba inteira usa uma única barra de rolagem.
 
 NOVIDADE v0.53.37: Linhagem de Gunndana apresenta a escolha Primordial/Elemental e concede Manipulação da terra nível 1 sem gastar pontos.
 
