@@ -27,6 +27,9 @@
   que essa sim usa left/right. Confundir as duas derruba o rdk i.
 -->
 <form name="frmItemHabilidade" height="116" theme="dark">
+    <script><![CDATA[
+        local _ENV = require("contextoFicha.lua").doItem(_ENV, self)
+    ]]></script>
 
     <event name="onNodeReady"><![CDATA[
         if sheet ~= nil then

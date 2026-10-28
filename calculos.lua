@@ -161,9 +161,17 @@ end
 -- entre parenteses, entao "(10 + Con 5 x 1,5 + rank 2 x 30) x 1,3" leria
 -- 77 x 1,3 enquanto o codigo faz 77,5 x 1,3 - e a conta deixaria de
 -- fechar exatamente nos vampiros de Constituicao impar.
+-- PROGRESSAO DE VIDA: livro/por-documento/3.2.md, "Pontos de vida":
+-- "cada vez que o personagem passa de nível, poderá ser rolado um dado
+-- adicional de vida ou considerado a metade do valor do mesmo, somado
+-- a pontuação inicial." O livro nao estende isto ao Vitae explicitamente.
+-- DECISAO DA MESA, 19/10/2026: a vida acumulada por nivel entra na BASE
+-- do Vitae, ANTES do percentual do Vigor (20 com +30% acrescenta 26).
+-- Usa o mesmo campo do Hp; nao soma o Hp inteiro nem multiplica a reserva.
 function Calculos.pv(ctx)
     if not ctx.ehVampiro then return 0, 0, 0 end
     local base = 10 + (n(ctx.constituicao) * 1.5) + (rankNumero(ctx.rank) * 30)
+        + n(ctx.progressaoVidaExtra)
     local ganho = base * (n(ctx.hpPercent) / 100)
     -- ctx.reserva = mana + aura, a aura ja com o percentual dela dentro.
     -- Calculada ANTES do Vitae em recalcularTudo(); mover o bloco faz o

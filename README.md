@@ -9,7 +9,7 @@ número** — para o jogador conferir sem abrir o livro e o mestre auditar de
 relance.
 
 <p align="center">
-  <img alt="versão" src="https://img.shields.io/badge/versão-0.53.40-C9A24B">
+  <img alt="versão" src="https://img.shields.io/badge/versão-0.53.42-C9A24B">
   <img alt="Firecast SDK" src="https://img.shields.io/badge/Firecast%20SDK-3.7b-8A63C9">
   <img alt="Lua" src="https://img.shields.io/badge/Lua-5.3-000080">
 </p>
@@ -28,9 +28,9 @@ relance.
 | 4 | Raça & Classe | 30 raças com escudo heráldico, mestiçagem lacrada, 12 classes e 36 subclasses |
 | 5 | Poderes & Habilidades | Kits das 18 divindades com kit, economia de pontos, construtor de habilidades |
 | 6 | Cálculos & Combate | Vida, Aura, Mana, Prana, Vitae, quatro defesas, movimento e ações |
-| 7 | Inventário | 250 entradas de loja, 64 encantamentos, oito slots de equipado, bolsa de moedas |
+| 7 | Inventário | Até 200 registros em páginas de 40, 250 entradas de loja, 64 encantamentos, oito slots de equipado, bolsa de moedas |
 | 8 | Criaturas | Gerador por rank que sorteia dentro da faixa do livro **e diz de onde cada número saiu** |
-| 9 | Favores Divinos | Favores por divindade, trocas, bênçãos e proclamação |
+| 9 | Favores Divinos | Saldos de −3 a +3 por divindade, páginas de 12, trocas, bênçãos e proclamação |
 | 10 | Background | Campo livre com formatação e imagens |
 
 ### Automações que valem o preço
@@ -85,6 +85,7 @@ rdk c
 ```
 ficha.lfm                     a ficha inteira: XML das 9 abas + 8.200 linhas de Lua
 module.xml                    manifesto do plugin
+contextoFicha.lua              ambiente separado por ficha e resolução do dono dos itens
 calculos.lua                  fórmulas do livro, isoladas e testáveis
 dadosSistema.lua              tabela de evolução: nível, rank, proficiência, XP
 catalogoItens.lua             250 entradas de loja (128 itens em seus níveis de qualidade)
@@ -129,9 +130,15 @@ não pegam:
 
 | Rede | Mede | Hoje |
 |---|---|---|
-| `verif/verifica.py` | o XML, o empacotamento, o texto que cabe na tela | 41 checagens |
-| `verif/testes.py` | as contas, em Lua puro, fora do Firecast | 188 asserções |
-| `verif/mutacao.py` | se as duas acima realmente mordem | 156 mutações |
+| `verif/verifica.py` | o XML, o empacotamento, o texto que cabe na tela | contagem na saída da bateria |
+| `verif/testes.py` | as contas, em Lua puro, fora do Firecast | contagem na saída da bateria |
+| `verif/mutacao.py` | se as duas acima realmente mordem | contagem na saída da bateria |
+
+Depois de compilar, rode também `verif/sonda_multificha.py <projeto> --rpk
+<pacote.rpk>`. Ela executa os construtores e eventos do pacote com duas fichas
+no mesmo ambiente Lua e confere o dono dos cliques, cálculos e gravações, além
+da recuperação após erro no recálculo. O host gráfico é simulado; a troca
+entre fichas e mesas no Firecast continua sendo a confirmação em tela.
 
 **Toda checagem nasceu de um bug que chegou ao usuário**, e a saída diz de qual.
 Uma checagem que não pega a própria mutação é decorativa, e a bateria de mutação
@@ -159,6 +166,9 @@ Anotadas aqui porque custaram caro:
   item da lista. Carregue e salve manualmente.
 - **Funções nomeadas dentro de templates de `recordList` viram globais** — a
   última linha criada sobrescreve todas as anteriores.
+- **O formulário principal também compartilha os globais do módulo.** A
+  partir da v0.53.40, `contextoFicha.lua` cria um ambiente por ficha; os itens
+  procuram o ambiente da ficha dona pela árvore de controles.
 - **Nunca apague o nó NDB container de uma `recordList`.** O widget perde o
   vínculo e só se recupera reabrindo a ficha.
 - **`#texto` conta bytes, não caracteres.** Em português isso são uns 10% de

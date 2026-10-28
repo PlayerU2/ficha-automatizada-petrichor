@@ -1,12 +1,53 @@
-FICHA DE PERSONAGEM - PETRICHOR - v0.53.40
+FICHA DE PERSONAGEM - PETRICHOR - v0.53.42
 
-CORREÇÃO v0.53.40: Coração de Mana usa a base pura de Mana. Dados por nível e bônus de Aura favorecem Mana, mas a base de Aura não é somada. Aura expandida também melhora sua recuperação.
+INTEGRACAO v0.53.42 (27/10/2026): incorpora as mudancas do GitHub ate
+c6f6a2a sem perder inventario paginado, favores negativos, poderes de
+atributo da mesma divindade, isolamento entre fichas e progressao no Vitae.
+As versoes 0.53.37 a 0.53.40 tiveram conteudos distintos nas duas linhas;
+os registros importados do GitHub estao identificados abaixo.
 
-HISTÓRICO v0.53.39: Primeira implementação da barra única de Mana; somava indevidamente a base de Aura, erro corrigido na v0.53.40.
+GITHUB v0.53.40: Coração de Mana usa a base pura de Mana. Dados por nível e bônus de Aura favorecem Mana, mas a base de Aura não é somada. Aura expandida também melhora sua recuperação.
 
-NOVIDADE v0.53.38: As listas de Qualidades e Defeitos crescem conforme os itens; a aba inteira usa uma única barra de rolagem.
+GITHUB v0.53.39: Primeira implementação da barra única de Mana; somava indevidamente a base de Aura, erro corrigido na v0.53.40 do GitHub.
 
-NOVIDADE v0.53.37: Linhagem de Gunndana apresenta a escolha Primordial/Elemental e concede Manipulação da terra nível 1 sem gastar pontos.
+GITHUB v0.53.38: As listas de Qualidades e Defeitos crescem conforme os itens; a aba inteira usa uma única barra de rolagem.
+
+GITHUB v0.53.37: Linhagem de Gunndana apresenta a escolha Primordial/Elemental e concede Manipulação da terra nível 1 sem gastar pontos.
+
+CORRECAO v0.53.41: Vida acumulada por nivel agora entra na base do Vitae,
+antes do percentual de Vigor. Com Vigor +30%, 20 acumulados acrescentam
+26 ao Vitae. A conta do card mostra a progressao. Usa o campo existente,
+sem migracao, e preserva o dano sofrido ao ajustar o maximo e o atual.
+
+CORRECAO v0.53.40: varias fichas abertas no mesmo Firecast agora mantem
+funcoes, estados e acoes separados. Abrir uma segunda ficha podia fazer
+a primeira agir sobre ela, parecendo travada e ate alterando dados da outra.
+As linhas de pericia, qualidade e habilidade agora usam a ficha dona.
+Um erro durante o recalculo tambem deixa de impedir as proximas tentativas.
+Essa protecao tambem cobre o redesenho e a edicao de vida das criaturas.
+Depois de instalar, FECHE O FIRECAST POR COMPLETO e abra novamente para
+descarregar as funcoes da versao anterior.
+
+NOVIDADE v0.53.39: o mestre pode usar RETIRAR FAVOR para registrar meio
+favor negativo com uma divindade, mesmo sem favores anteriores. Cada
+divindade tem saldo unico de -3 a +3; ganhos e retiradas se compensam.
+O zero continua visivel. Negativos ficam destacados, sem penalidade
+automatica e sem habilitar beneficios ou trocas. A lista de divindades
+agora tem paginas de 12 registros.
+
+NOVIDADE v0.53.38: a mesa permite comprar dois poderes passivos que bonificam
+atributos da mesma divindade, sem autorizacao do mestre. Permanece o maximo
+de dois poderes de atributo e tres passivos no total. O contador nao marca
+mais a origem repetida como irregular. O aviso sobre alternativas "OU" de um
+mesmo slot continua sendo apenas um aviso, sem bloquear a compra.
+
+NOVIDADE v0.53.37: o inventario comporta 200 registros de itens, compartilhados
+entre Equipados, Mochila e Bau. Use ANTERIOR / PROXIMA no topo ou no rodape
+da lista para navegar em paginas de 40. Ao adicionar um item, a ficha abre
+a pagina dele; ao esvaziar a ultima pagina, volta para a anterior.
+As quantidades empilhadas continuam em um unico registro. Capacidade da
+mochila e efeitos equipados consideram o inventario inteiro. Fichas antigas
+mantem os mesmos dados e nao precisam de conversao.
 
 NOVIDADE v0.53.36: o registro de slots para encantamentos personalizados agora
 conta com catalogo visual de slots e editor integrado com campo multilinha,
@@ -142,14 +183,14 @@ reabrir a ficha: o Firecast mantem cache do plug-in e voce vai continuar
 vendo a versao antiga, achando que a instalacao falhou.
 
 A versao fica carimbada NA TELA, a esquerda de "SECAO 01". Se o selo nao
-disser v0.53.28, o que esta rodando nao e este pacote.
+disser v0.53.42, o que esta rodando nao e este pacote.
 
 
 =======================================================================
  4. ESTRUTURA DO PACOTE
 =======================================================================
 
-  module.xml                            manifesto (sdkVersion 3.7b, v0.53.28)
+  module.xml                            manifesto (sdkVersion 3.7b, v0.53.42)
   ficha.lfm                             ficha completa, 10 abas
   LEIA-ME.txt                           este arquivo
   CHANGELOG.md                          o que mudou em cada versao, e por que
@@ -201,7 +242,8 @@ disser v0.53.28, o que esta rodando nao e este pacote.
     tiver muito detalhe fino, confira como ele fica nos 38px antes de
     entregar para a mesa - o que some nesse tamanho some para todos.
 
-  regras e catalogos  (14 arquivos .lua na raiz)
+  regras, catalogos e contexto  (15 arquivos .lua na raiz)
+    contextoFicha.lua                  ambiente separado por ficha e itens
     dadosSistema.lua                    nivel / rank / proficiencia
     calculos.lua                        Hp, Mp, Ap, Pv, defesas, deslocamento
     catalogoPericias.lua                64 pericias por atributo
@@ -459,10 +501,9 @@ assim a tela achou cinco coisas. Confira nesta ordem:
   2. ABA 05, catalogo, divindade RAS'BUZ: o slot 4 tem TRES opcoes
      (agua, terra, ar) e o rotulo agora diz "um dos tres". Os outros 19
      slots com "ou" continuam "um dos dois".
-  3. ABA 05, painel de cima: se os DOIS poderes de atributo vierem da
-     mesma divindade, o contador avisa em dourado. O livro [2.4] nao
-     permite; a v0.42.0 so recusava a compra nova e ficava calada
-     sobre a ficha que ja estava assim.
+  3. ABA 05, painel de cima (historico da v0.42.1): o contador antes
+     avisava em dourado quando dois poderes de atributo vinham da mesma
+     divindade. A decisao da mesa na v0.53.38 revogou esse alerta.
   4. ABA 05, catalogo com nada selecionado: o lado direito nao mostra
      mais o esqueleto vazio de "PROGRESSAO / NIVEL 1..5".
   5. ABA 08, editar criatura: a linha cinza que explica o rank ("Rank E
@@ -490,8 +531,9 @@ NOVO NA v0.42.0 - a rodada da bateria de testes (37 achados de
      divindade mostra 5 slots, com "SLOT n - um dos dois" (ou tres)
      onde o livro
      escreve OU; o card que acende e o do kit certo. Comprar dois
-     poderes de atributo do MESMO aspecto e recusado (o mestre libera
-     com AUTORIZAR); comprar as duas alternativas de um slot AVISA.
+     poderes de atributo do MESMO aspecto era recusado na v0.42.0; desde
+     a v0.53.38 e permitido pela mesa. Comprar as duas alternativas de um
+     slot continua gerando apenas um AVISO.
   6. ABA 08 - reabra uma criatura salva: o botao "O QUE FICOU PARA
      VOCE" esta la, e abre numa coluna a direita sem esconder os campos.
      APLICAR de novo nao apaga um atributo que voce digitou. Constructo

@@ -25,5 +25,8 @@
   nomeada vira GLOBAL, e a ultima linha criada sobrescreve todas as outras.
 -->
 <form name="frmItemCriatura" height="4" theme="dark">
+    <script><![CDATA[
+        local _ENV = require("contextoFicha.lua").doItem(_ENV, self)
+    ]]></script>
     <layout align="client"/>
 </form>

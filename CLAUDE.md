@@ -13,9 +13,10 @@ divergirem.
 ## Antes de entregar
 
 ```
-verificar   →  55 checagens de empacotamento
-testes      →  303 asserções em Lua puro
+verificar   →  checagens de empacotamento (contagem na saída da bateria)
+testes      →  asserções em Lua puro (contagem na saída da bateria)
 rdk l       →  lint do SDK
+multificha  →  python ..\firecast-mcp\verif\sonda_multificha.py . --rpk output\Ficha-Petrichor.rpk
 rdk i       →  instala; depois FECHE o Firecast por completo
 ```
 
@@ -24,6 +25,12 @@ pedir** (decisão dele, 09/09/2026): *"fica difícil sempre que mudar alguma
 coisa, ou arrumar, eu ter que esperar tanto tempo até todos os testes
 rodarem"*. Vinte e dois minutos entre um conserto e a tela custam mais do que
 a mutação rende numa entrega que não toca em checagem nenhuma.
+
+**A sonda multificha lê o compilado do pacote**, por isso roda depois do
+`rdk l` e também contra o `.rpk` instalado. Ela nasceu do cruzamento real de
+eventos entre formulários na v0.53.39; uma bateria de uma ficha só não pega
+essa classe. Use o ambiente por instância de `contextoFicha.lua` no principal
+e nos templates, sem publicar novamente funções de personagem no módulo.
 
 O que ela mede continua valendo: **checagem que não pega a própria mutação é
 decorativa**. Então há um caso em que ela deixa de ser opcional — **mexeu em

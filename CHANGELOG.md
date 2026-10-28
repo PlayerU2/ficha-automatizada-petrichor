@@ -1,24 +1,70 @@
-## v0.53.40
+## v0.53.42 — integração das linhas local e GitHub (27/10/2026)
+
+- integra o GitHub até `c6f6a2a`, preservando as correções locais de inventário paginado, poderes de atributo da mesma divindade, favores negativos, isolamento entre fichas e progressão de vida no Vitae;
+- incorpora a escolha e o poder gratuito de Gunndana, a rolagem única de Qualidades & Defeitos e a Mana pura do Coração de mana com os modificadores antes ligados à Aura;
+- mantém os históricos abaixo separados por linha: os números 0.53.37 a 0.53.40 foram usados independentemente no GitHub e neste PC, com conteúdos diferentes;
+- atualiza o contexto e os testes da versão combinada, sem publicar alterações no GitHub.
+
+## v0.53.40 — linha GitHub, Coração de mana
 
 - Corrige Coração de mana: usa a base pura de Mana, acrescida de dados acumulados por nível, ajuste antes dirigido à Aura e modificadores como Aura expandida. A base de Aura não é somada; só Linhagem de Unaris soma Mana e Aura no Prana.
 - Mantém a barra de Aura oculta para Coração de mana, aplica o bônus de recuperação de Aura expandida à Mana e corrige a explicação da conta no card.
 - Fichas salvas na v0.53.39 têm o máximo e o valor atual da Mana recalculados sem a base de Aura indevida.
 
-## v0.53.39
+## v0.53.39 — linha GitHub
 
 - Introduziu uma única barra de Mana para Coração de mana, mas somava por engano a base inteira de Aura. Corrigido na v0.53.40.
 - O card de Aura passou a sumir e o descanso passou a recuperar a Mana ampliada.
 - Linhagem de Unaris preserva a regra própria do Prana.
 
-## v0.53.38
+## v0.53.38 — linha GitHub
 
 - A aba Qualidades & Defeitos rola como uma página única; as duas listas crescem conforme o número de registros, eliminando as barras internas e os itens cortados.
 
-## v0.53.37
+## v0.53.37 — linha GitHub
 
 - Linhagem de Gunndana exibe a escolha Primordial/Elemental na aba Qualidades & Defeitos.
 - Manipulação da terra entra no nível 1 quando a qualidade é adquirida, sem custo de pontos; ao remover a qualidade, o nível criado automaticamente sai se não houve compras posteriores.
 - Se o poder já existia, ele é preservado e seu primeiro nível passa a ser gratuito enquanto a qualidade estiver presente.
+
+## v0.53.41 — progressão de vida no Vitae (19/10/2026)
+
+- corrige a vida acumulada por nível que só alimentava o Hp invisível dos vampiros e não chegava ao Vitae;
+- aplica a decisão da mesa: a progressão integra a base antes do percentual de Vigor, sem multiplicar a reserva de Aura e Mana;
+- mostra a parcela de progressão na conta do card, usando o campo existente e mantendo o dano sofrido quando o máximo muda;
+- acrescenta regressões de fórmula, integração, conta exibida, Vigor e retirada da progressão, tanto para vampiros comuns quanto para a Linhagem de Unaris.
+
+## v0.53.40 — isolamento entre fichas e recuperação do recálculo (19/10/2026)
+
+- corrige o compartilhamento de funções e estados entre formulários do mesmo plugin: abrir outra ficha podia fazer um clique, cálculo ou gravação atuar sobre ela;
+- cria um ambiente Lua por ficha e faz os templates de lista resolverem as funções da ficha dona pela árvore de controles;
+- libera a guarda de recálculo mesmo quando ocorre erro, permitindo uma nova tentativa sem fechar e reabrir a ficha;
+- protege também a guarda de pintura de Criaturas, tanto no redesenho quanto na correção da vida digitada, para que uma falha não bloqueie as edições seguintes;
+- acrescenta uma sonda que executa os construtores e eventos reais do `.rpk` com duas fichas no mesmo ambiente, cobrindo navegação, perícias, gravação e recuperação após falha;
+- adapta a bateria existente para executar seus cenários no ambiente da ficha, preservando a cobertura de regras.
+
+## v0.53.39 — saldos negativos de favor (19/10/2026)
+
+- registra a decisão da mesa de usar um saldo único por divindade, de −3 a +3: ganhos e retiradas se compensam, e o registro continua visível em zero;
+- permite ao mestre retirar meio favor de uma divindade ainda sem registro, sem criar penalidade automática para saldos negativos;
+- exibe o sinal e os marcadores negativos na aba e no seletor, mantendo benefícios e trocas restritos aos patamares positivos;
+- pagina os saldos em grupos de 12 para que nenhum registro fique invisível e preserva a divindade correta nos botões de cada linha;
+- acrescenta testes da gravação, da tela e dos limites, sem alterar os dados de fichas antigas.
+
+## v0.53.38 — dois poderes de atributo da mesma divindade (19/10/2026)
+
+- aplica a decisão da mesa que permite os dois poderes passivos de atributo virem da mesma divindade, sem autorização do mestre;
+- preserva os limites de dois poderes de atributo e três passivos no total;
+- remove o alerta de origem repetida do contador e preserva o aviso independente das alternativas "OU" do mesmo slot;
+- atualiza o contexto da mesa e os testes para que a restrição antiga não volte por engano.
+
+## v0.53.37 — inventário com 200 registros e paginação (19/10/2026)
+
+- aumenta o limite compartilhado de Equipados, Mochila e Baú de 40 para 200 registros, tanto para itens do catálogo quanto para itens livres;
+- reutiliza as 40 linhas da tela com navegação no topo e no rodapé; cada botão resolve o índice absoluto do item mostrado;
+- mantém os grupos e suas contagens globais, repetindo o cabeçalho quando um grupo continua na página seguinte;
+- abre a página do item adicionado e recua quando a última página fica vazia;
+- preserva os dados existentes, as quantidades empilhadas, a capacidade da mochila e os cálculos do inventário inteiro.
 
 ## v0.53.34 — auditoria e automações completas de Raças (18/09/2026)
 

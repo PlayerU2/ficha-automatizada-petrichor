@@ -26,6 +26,9 @@
                     divino num personagem mestico)
 -->
 <form name="frmItemCaracRacial" height="78" theme="dark">
+    <script><![CDATA[
+        local _ENV = require("contextoFicha.lua").doItem(_ENV, self)
+    ]]></script>
 
     <event name="onNodeReady"><![CDATA[
         if sheet ~= nil then

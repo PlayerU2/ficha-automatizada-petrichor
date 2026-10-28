@@ -16,6 +16,9 @@
       raca, poder ou outra qualidade (ver CONCESSOES no ficha.lfm)
 -->
 <form name="frmItemQualidadeDefeito" height="58" theme="dark">
+    <script><![CDATA[
+        local _ENV = require("contextoFicha.lua").doItem(_ENV, self)
+    ]]></script>
 
     <event name="onNodeReady"><![CDATA[
         if sheet ~= nil then
