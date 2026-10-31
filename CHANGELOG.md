@@ -1,3 +1,10 @@
+## v0.53.43 — dado de vida do Minotauro (31/10/2026)
+
+- Corrige o máximo racial de `1d12+4` de 12 para 16, que alimenta o Hp na aba de Combate e a comparação da herança mestiça.
+- Mostra a expressão do livro no painel racial, mantendo o campo numérico do combate editável e explicando o bônus fixo na dica.
+- Repara uma vez fichas antigas de Minotauro ou mestiças com Minotauro que ainda guardam 12; valores manuais diferentes e dano sofrido são preservados.
+- Compara o valor numérico com a expressão do dado em todas as raças do catálogo, além de testar seleção, migração, Hp e exibição.
+
 ## v0.53.42 — integração das linhas local e GitHub (27/10/2026)
 
 - integra o GitHub até `c6f6a2a`, preservando as correções locais de inventário paginado, poderes de atributo da mesma divindade, favores negativos, isolamento entre fichas e progressão de vida no Vitae;

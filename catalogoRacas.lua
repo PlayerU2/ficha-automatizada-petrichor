@@ -1017,7 +1017,9 @@ Fraternidade e União: são ensinados desde jovens a valorizar a comunidade, enx
         sangueAntigas = true,
         mesticoPermitido = true,
         deslocamentoNum = 8,
-        dadoVidaNum = 12,
+        -- Livro 1.6, Minotauros: "Dado de Vida: 1d12+4".
+        -- Livro 3.2: o dado na vida inicial equivale ao valor maximo.
+        dadoVidaNum = 16,
         deslocamentoTexto = [==[8m]==],
         dadoVidaTexto = [==[1d12+4]==],
         deslocamentoModos = { terrestre = 8 },

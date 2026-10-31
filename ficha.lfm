@@ -1007,6 +1007,27 @@
             -- -15%/-30% de Hp). Ver catalogoQualidadesDefeitos.lua.
             local efeitosQD = CatalogoQD.somarEfeitos(escolhidosQD())
 
+            -- Livro 1.6, Minotauros: "Dado de Vida: 1d12+4"; livro 3.2:
+            -- o valor usado na vida inicial e o maximo do dado. Ate v0.53.42
+            -- o catalogo gravava 12. Repara UMA VEZ o valor antigo exato,
+            -- inclusive na heranca mestica, sem tocar nos ajustes diferentes.
+            local minotauroNaFicha = tostring(sheet.raca or "") == "Minotauros" or
+                (contextoRacial().temMestico and
+                 tostring(sheet.mesticoRacaSecundaria or "") == "Minotauros")
+            -- Marca em string, como recursosAtuaisIniciados: o NDB pode
+            -- devolver booleanos de formas diferentes apos salvar/reabrir.
+            if minotauroNaFicha and tostring(sheet.minotauroDadoVidaCorrigido or "") ~= "1" then
+                if n(sheet.dadoVida) == 12 then
+                    sheet.dadoVida = 16
+                    -- Na abertura, o painel racial ja foi pintado antes do
+                    -- primeiro recalculo: atualiza a saida que o jogador ve.
+                    if self.abaRaca_lblBase ~= nil then
+                        self.abaRaca_lblBase:setText(textoAtributosBase())
+                    end
+                end
+                sheet.minotauroDadoVidaCorrigido = "1"
+            end
+
             local hpBase = Calculos.hp({
                 nivel = nivel, constituicao = valores.constituicao,
                 dadoVida = sheet.dadoVida, progressaoVidaExtra = sheet.progressaoVidaExtra,
@@ -4578,7 +4599,7 @@
         -- REGRA DE MESA (não está escrita no .bib - a entrada da qualidade
         -- Mestiço só fala das habilidades raciais): o mestiço fica com o MAIOR
         -- valor entre as duas raças, atributo por atributo. Ex.: Humanos
-        -- (10m / 1d10) + Minotauros (8m / 1d12) resulta em 10m / 1d12.
+        -- (10m / 1d10) + Minotauros (8m / 1d12+4) resulta em 10m / 1d12+4.
         --
         -- É calculado atributo a atributo, não "o pacote da melhor raça".
         --
@@ -4592,6 +4613,7 @@
             local principal = CatalogoRacas.buscarPorNome(tostring(sheet.raca or ""))
             local desloc = principal and principal.deslocamentoNum or 0
             local dado = principal and principal.dadoVidaNum or 0
+            local minotauroSelecionado = principal ~= nil and principal.nome == "Minotauros"
 
             -- Modos de deslocamento (terrestre ja vem em deslocamentoNum;
             -- voo e nado saem de deslocamentoModos, regerado do livro).
@@ -4616,6 +4638,7 @@
                 if secundaria ~= nil then
                     desloc = math.max(desloc, secundaria.deslocamentoNum or 0)
                     dado = math.max(dado, secundaria.dadoVidaNum or 0)
+                    minotauroSelecionado = minotauroSelecionado or secundaria.nome == "Minotauros"
                     voo = math.max(voo, n(modosDe(secundaria).voo))
                     nado = math.max(nado, n(modosDe(secundaria).nado))
                     escalada = math.max(escalada, n(modosDe(secundaria).escalada))
@@ -4629,6 +4652,7 @@
             NDB.beginUpdate(sheet)
             if desloc > 0 then sheet.deslocamentoBaseRaca = desloc end
             if dado > 0 then sheet.dadoVida = dado end
+            if minotauroSelecionado then sheet.minotauroDadoVidaCorrigido = "1" end
 
             -- Estes SEMPRE sao escritos, inclusive com zero: trocar de raça
             -- precisa APAGAR o voo da raça anterior. Guardar so quando > 0
@@ -4656,8 +4680,21 @@
             local desloc = n(sheet.deslocamentoBaseRaca)
             local dado = n(sheet.dadoVida)
             if desloc <= 0 and dado <= 0 then return "—" end
-            local txt = "Deslocamento: " .. tostring(desloc) .. "m     •     Dado de Vida: 1d" .. tostring(dado)
-            if contextoRacial().temMestico and tostring(sheet.mesticoRacaSecundaria or "") ~= "" then
+            local principal = CatalogoRacas.buscarPorNome(tostring(sheet.raca or ""))
+            local usandoMestico = contextoRacial().temMestico and tostring(sheet.mesticoRacaSecundaria or "") ~= ""
+            local origemDado = principal
+            if usandoMestico then
+                local secundaria = CatalogoRacas.buscarPorNome(tostring(sheet.mesticoRacaSecundaria))
+                if secundaria ~= nil and (principal == nil or n(secundaria.dadoVidaNum) > n(principal.dadoVidaNum)) then
+                    origemDado = secundaria
+                end
+            end
+            local dadoTexto = "valor " .. tostring(dado) .. " (ajustado)"
+            if origemDado ~= nil and dado == n(origemDado.dadoVidaNum) then
+                dadoTexto = tostring(origemDado.dadoVidaTexto)
+            end
+            local txt = "Deslocamento: " .. tostring(desloc) .. "m     •     Dado de Vida: " .. dadoTexto
+            if usandoMestico then
                 txt = txt .. "     •     mestiço fica com o MAIOR valor entre "
                     .. racaPrincipalMestico() .. " e " .. tostring(sheet.mesticoRacaSecundaria)
             end
@@ -16478,7 +16515,7 @@
                          O numero e ESCRITO A MAO aqui e conferido pela
                          checagem 27 contra o module.xml - se alguem esquecer
                          de subir um dos dois, o build para. -->
-                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.42" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
+                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.43" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
                     <label name="lblSecaoAtual" align="client" text="SEÇÃO 01  •  DADOS PESSOAIS" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="12" vertTextAlign="center" margins="{left=8}"/>
                 </layout>
 
@@ -17584,7 +17621,7 @@
                         <layout name="cmb_compDadoVida" align="left" width="220" margins="{right=12}">
                             <label align="top" height="15" text="Dado de vida (raça)" fontFamily="EB Garamond" fontColor="#54636B" fontSize="11" hitTest="false"/>
                             <rectangle align="client" color="#080B0E" strokeColor="#1E2A31" strokeSize="1" xradius="3" yradius="3">
-                                <edit align="client" field="dadoVida" type="number" text="0" fontFamily="EB Garamond" fontColor="#E6E9E4" fontSize="13" horzTextAlign="center" transparent="true" hint="Valor máximo do dado de vida da sua raça.">
+                                <edit align="client" field="dadoVida" type="number" text="0" fontFamily="EB Garamond" fontColor="#E6E9E4" fontSize="13" horzTextAlign="center" transparent="true" hint="Valor máximo completo do dado racial, incluindo bônus fixo: 1d12+4 vale 16. Pode ajustar manualmente.">
                                     <event name="onChange"><![CDATA[recalcularTudo();]]></event>
                                 </edit>
                             </rectangle>

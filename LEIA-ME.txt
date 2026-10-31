@@ -1,4 +1,9 @@
-FICHA DE PERSONAGEM - PETRICHOR - v0.53.42
+FICHA DE PERSONAGEM - PETRICHOR - v0.53.43
+
+CORRECAO v0.53.43 (31/10/2026): o dado de vida do Minotauro 1d12+4
+entra com valor maximo 16 na aba de Combate, inclusive na heranca mestica.
+Fichas antigas com valor automatico 12 recebem o reparo uma vez, mantendo
+o dano sofrido e respeitando valores manuais diferentes.
 
 INTEGRACAO v0.53.42 (27/10/2026): incorpora as mudancas do GitHub ate
 c6f6a2a sem perder inventario paginado, favores negativos, poderes de
@@ -183,14 +188,14 @@ reabrir a ficha: o Firecast mantem cache do plug-in e voce vai continuar
 vendo a versao antiga, achando que a instalacao falhou.
 
 A versao fica carimbada NA TELA, a esquerda de "SECAO 01". Se o selo nao
-disser v0.53.42, o que esta rodando nao e este pacote.
+disser v0.53.43, o que esta rodando nao e este pacote.
 
 
 =======================================================================
  4. ESTRUTURA DO PACOTE
 =======================================================================
 
-  module.xml                            manifesto (sdkVersion 3.7b, v0.53.42)
+  module.xml                            manifesto (sdkVersion 3.7b, v0.53.43)
   ficha.lfm                             ficha completa, 10 abas
   LEIA-ME.txt                           este arquivo
   CHANGELOG.md                          o que mudou em cada versao, e por que
