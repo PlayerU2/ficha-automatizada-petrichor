@@ -1,3 +1,13 @@
+## v0.54.0 — modo Mestre para NPCs (31/10/2026)
+
+- O selo abre a escolha entre Em criação, Ficha finalizada e Mestre. O modo é salvo por ficha; só o mestre da mesa ou o editor local pode entrar ou sair do modo NPC.
+- No modo Mestre, dispensa tetos e saldos de jogador, requisitos de raça/equipamento, ranks por poder, limite e oposição de tags, lacres e composição da mestiçagem. As fórmulas e ajustes continuam disponíveis, sem inventar efeitos além das tabelas.
+- Bloqueia os anúncios da ficha antes de consultar o chat, nos dois transportes. O sigilo permanece mesmo quando o leitor não é mestre ou a descoberta de permissão falha; as permissões de leitura continuam sendo responsabilidade do Firecast.
+- Reutiliza as linhas de poderes em páginas para permitir NPCs com todos os poderes do catálogo sem acrescentar dezenas de componentes.
+- Preserva valores de nível, atributos, recursos atuais e inspiração acima dos tetos de jogador. O seletor avisa que sair do modo reaplica as regras normais.
+- Corrige os tamanhos de fonte preexistentes reprovados pela checagem de tipografia e testa sigilo, permissões, persistência, exceções e isolamento entre fichas.
+- As novas habilidades raciais e de famílias nobres recebidas em 31/10 permanecem como fontes da mesa para preenchimento manual, por decisão dos mestres.
+
 ## v0.53.43 — dado de vida do Minotauro (31/10/2026)
 
 - Corrige o máximo racial de `1d12+4` de 12 para 16, que alimenta o Hp na aba de Combate e a comparação da herança mestiça.

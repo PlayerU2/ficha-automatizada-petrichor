@@ -9,7 +9,7 @@ número** — para o jogador conferir sem abrir o livro e o mestre auditar de
 relance.
 
 <p align="center">
-  <img alt="versão" src="https://img.shields.io/badge/versão-0.53.43-C9A24B">
+  <img alt="versão" src="https://img.shields.io/badge/versão-0.54.0-C9A24B">
   <img alt="Firecast SDK" src="https://img.shields.io/badge/Firecast%20SDK-3.7b-8A63C9">
   <img alt="Lua" src="https://img.shields.io/badge/Lua-5.3-000080">
 </p>
@@ -17,6 +17,13 @@ relance.
 ---
 
 ## O que ela faz
+
+**Modo Mestre para NPCs:** clique no selo de estado e escolha **Mestre**.
+O mestre edita sem as restrições de jogador e os anúncios desta ficha ficam
+bloqueados no chat, inclusive quando outra ficha está aberta. Fórmulas e
+ajustes manuais continuam disponíveis; valores além das tabelas não inventam
+progressão. Ao voltar aos modos normais, os limites de jogador retornam.
+Configure também as permissões do NPC no Firecast para restringir sua leitura.
 
 **Dez seções**, cada uma alimentando a seguinte:
 

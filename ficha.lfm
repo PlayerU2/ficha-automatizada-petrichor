@@ -112,11 +112,74 @@
         -- somente-leitura para ele. O MESTRE continua podendo alterar tudo,
         -- e so o mestre consegue destravar a ficha de volta.
         -- =================================================================
+        -- DECISAO DA MESA, 31/10/2026: NPC em modo Mestre ignora as
+        -- restricoes de jogador e nao publica nenhuma informacao no chat.
+        -- A privacidade depende do estado SALVO; nunca de quem abriu a ficha.
+        function fichaEmModoMestre()
+            return sheet ~= nil and sheet.modoMestre == true
+        end
+
+        function usuarioPodeUsarModoMestre()
+            -- Falha de permissao nao libera o modo. Biblioteca local sem
+            -- personagem associado continua disponivel para preparar NPCs.
+            local ok, permitido = pcall(function()
+                local mesaDireta = Firecast.getMesaDe(sheet)
+                if mesaDireta ~= nil then
+                    return mesaDireta.meuJogador ~= nil and mesaDireta.meuJogador.isMestre == true
+                end
+                local personagem = rrpg.getPersonagemDe(sheet)
+                if personagem == nil then return true end
+                local mesa = personagem.mesa
+                return mesa ~= nil and mesa.meuJogador ~= nil
+                    and mesa.meuJogador.isMestre == true
+            end)
+            return ok and permitido == true
+        end
+
+        function modoMestreAtivo()
+            return fichaEmModoMestre() and usuarioPodeUsarModoMestre()
+        end
+
+        function podeEscolherRaca(dados, contexto)
+            if modoMestreAtivo() and dados ~= nil then return true, "Mestre: raça livre para NPC." end
+            return CatalogoRacas.podeEscolher(dados, contexto)
+        end
+
+        function abrirSeletorModoFicha()
+            if self.popModoFicha == nil then return end
+            if self.lblSaidaModoMestre ~= nil then
+                self.lblSaidaModoMestre:setText(fichaEmModoMestre() and
+                    "Ao sair de Mestre, os limites de jogador voltam a ser aplicados. Confirme a escolha abaixo." or
+                    "Mestre: NPC com edicao livre e anuncios da ficha bloqueados.")
+            end
+            abrirPopupAjustado(self.popModoFicha, 500, 290)
+        end
+
+        function definirModoFicha(modo)
+            if sheet == nil then return false end
+            if modo ~= "criacao" and modo ~= "finalizada" and modo ~= "mestre" then return false end
+            if (modo == "mestre" or fichaEmModoMestre()) and not usuarioPodeUsarModoMestre() then
+                atualizarSeloFinalizada("Somente o MESTRE altera o modo NPC.")
+                return false
+            end
+            if fichaEstaFinalizada() and modo == "criacao" and not usuarioEhMestre() then
+                atualizarSeloFinalizada("Somente o MESTRE pode destravar a ficha.")
+                return false
+            end
+            sheet.modoMestre = modo == "mestre"
+            sheet.fichaFinalizada = modo == "finalizada"
+            if self.popModoFicha ~= nil then self.popModoFicha:close() end
+            recalcularTudo()
+            atualizarSeloFinalizada()
+            return true
+        end
+
         function fichaEstaFinalizada()
             return sheet ~= nil and sheet.fichaFinalizada == true
         end
 
         function podeEditarCriacao()
+            if fichaEmModoMestre() then return usuarioPodeUsarModoMestre() end
             if not fichaEstaFinalizada() then return true end
             return usuarioEhMestre()
         end
@@ -142,6 +205,7 @@
         end
 
         function alternarFichaFinalizada()
+            if fichaEmModoMestre() then abrirSeletorModoFicha(); return end
             if sheet == nil then return end
             -- Finalizar: qualquer um pode. Destravar: so o mestre.
             if fichaEstaFinalizada() and not usuarioEhMestre() then
@@ -260,7 +324,7 @@
             for _, e in ipairs(CAMPOS_TRAVA_CRIACAO) do
                 local w = self[e.widget]
                 if w ~= nil then
-                    local livre = pode and not e.sempre
+                    local livre = pode and (not e.sempre or modoMestreAtivo())
                     pcall(function() w:setEnabled(livre) end)
                     -- Os campos do catalogo continuam legiveis com a cor
                     -- normal: sao informacao, nao campo apagado.
@@ -283,7 +347,11 @@
                 self.lblSeloFinalizada:setFontColor(COR.wine)
                 return
             end
-            if fichaEstaFinalizada() then
+            if fichaEmModoMestre() then
+                self.lblSeloFinalizada:setText("MESTRE")
+                self.lblSeloFinalizada:setFontColor(COR.aura)
+                if self.rectSeloFinalizada ~= nil then self.rectSeloFinalizada:setStrokeColor(COR.aura) end
+            elseif fichaEstaFinalizada() then
                 self.lblSeloFinalizada:setText("FICHA FINALIZADA")
                 self.lblSeloFinalizada:setFontColor(COR.gold)
                 if self.rectSeloFinalizada ~= nil then self.rectSeloFinalizada:setStrokeColor(COR.gold) end
@@ -658,7 +726,7 @@
                     end
                 end
                 -- teto duro; piso nenhum, de proposito (regra 3 acima)
-                if n(sheet[cAtual]) > maximo then
+                if not modoMestreAtivo() and n(sheet[cAtual]) > maximo then
                     if r.chave == barraDoFerido then
                         moverBase(maximo - n(sheet[cAtual]))
                     end
@@ -866,7 +934,7 @@
             -- o mestre pode reduzir o nivel na mao se precisar).
             local xpAtual = n(sheet.experiencia)
             local nivelPorXp = DadosSistema.nivelPorXP(xpAtual)
-            if nivelPorXp > n(sheet.nivel) then
+            if not modoMestreAtivo() and nivelPorXp > n(sheet.nivel) then
                 sheet.nivel = nivelPorXp
             end
 
@@ -881,7 +949,7 @@
             local nivel = n(sheet.nivel)
             local nivelDigitado = nivel
             if nivel < 1 then nivel = 1 end
-            if nivel > 20 then nivel = 20 end
+            if not modoMestreAtivo() and nivel > 20 then nivel = 20 end
             if nivel ~= nivelDigitado then
                 sheet.nivel = nivel
                 avisoNivelCorrigido = "Nível " .. fmtNumero(nivelDigitado) ..
@@ -1731,7 +1799,7 @@
                 gravarTracos(lista)
                 -- Aviso, nao bloqueio: a decisao final e do mestre.
                 local dados = CatalogoTracos.buscarPorNome(nome)
-                if dados ~= nil and dados.oposto ~= nil and temTraco(dados.oposto) then
+                if not modoMestreAtivo() and dados ~= nil and dados.oposto ~= nil and temTraco(dados.oposto) then
                     avisarTracos("Atenção: " .. nome .. " e " .. dados.oposto ..
                         " são opostos. Em regra não se tem os dois — a ficha aceita, mas confira.", COR.gold)
                 else
@@ -1821,7 +1889,9 @@
                 if escolhendoLegado then
                     local aspecto = tostring(sheet and sheet.aspectoDivino or "")
                     local legado = tostring(sheet and sheet.deusLegado or "")
-                    if legado ~= "" then
+                    if modoMestreAtivo() then
+                        self.popDeus_lblInstrucaoModo:setText("Mestre: escolha ou substitua a divindade livremente.")
+                    elseif legado ~= "" then
                         self.popDeus_lblInstrucaoModo:setText(
                             "Legado lacrado em " .. legado .. ". Esta associação é permanente e não pode ser substituída.")
                         self.popDeus_lblInstrucaoModo:setFontColor(COR.gold)
@@ -1833,6 +1903,7 @@
                     end
                 else
                     self.popDeus_lblInstrucaoModo:setText(
+                        modoMestreAtivo() and "Mestre: escolha livre de divindade para o NPC." or
                         "A divindade define o kit principal de poderes do semideus. Somente os deuses grandes podem ser escolhidos como Aspecto Divino.")
                     self.popDeus_lblInstrucaoModo:setFontColor(COR.faint)
                 end
@@ -1865,7 +1936,7 @@
             if self.popDeuses == nil or sheet == nil then return end
             if not temLegadoDesperto() then return end
             local aspecto = tostring(sheet.aspectoDivino or "")
-            if aspecto == "" then
+            if not modoMestreAtivo() and aspecto == "" then
                 if self.lblLimiteQDTexto ~= nil then
                     self.lblLimiteQDTexto:setText(
                         "Escolha primeiro o pai/mãe no campo Aspecto Divino do Perfil. O deus do legado deve ser outra divindade.")
@@ -1970,7 +2041,7 @@
             end
             if self.popDeus_lblCategoria ~= nil then
                 local txt = "Deus " .. d.categoria:lower()
-                if not d.selecionavel then
+                if not modoMestreAtivo() and not d.selecionavel then
                     txt = txt .. "   •   " .. CatalogoDeuses.motivoBloqueio(d)
                     self.popDeus_lblCategoria:setFontColor(COR.wine)
                 else
@@ -2013,7 +2084,7 @@
             ajustarAlturaLoreDeus(d)
 
             if self.popDeus_lblBtnEscolher ~= nil then
-                if not d.selecionavel then
+                if not modoMestreAtivo() and not d.selecionavel then
                     self.popDeus_lblBtnEscolher:setText("SOMENTE DEUSES GRANDES PODEM SER ESCOLHIDOS")
                     self.popDeus_lblBtnEscolher:setFontColor(COR.faint)
                 elseif modoSelecaoDeus == "legado" then
@@ -2087,7 +2158,7 @@
         function escolherDeusEmDetalhe()
             if deusEmDetalhe == nil then return end
             local d = CatalogoDeuses.buscarPorNome(deusEmDetalhe)
-            if d == nil or not d.selecionavel then return end
+            if d == nil or (not modoMestreAtivo() and not d.selecionavel) then return end
             if modoSelecaoDeus == "legado" then
                 selecionarDeusLegado(d.nome)
             else
@@ -2099,7 +2170,7 @@
             if sheet == nil then return end
             local anterior = tostring(sheet.aspectoDivino or "")
 
-            if nome == tostring(sheet.deusLegado or "") then
+            if not modoMestreAtivo() and nome == tostring(sheet.deusLegado or "") then
                 if self.popDeus_lblCategoria ~= nil then
                     self.popDeus_lblCategoria:setText(
                         "ESCOLHA RECUSADA — pai/mãe e divindade do legado precisam ser deuses diferentes.")
@@ -2119,7 +2190,7 @@
                 return
             end
 
-            if anterior ~= nome and aspectoLacrado() then
+            if not modoMestreAtivo() and anterior ~= nome and aspectoLacrado() then
                 -- Consome a autorizacao, devolve os pontos e reabre o lacre
                 -- para a nova divindade. Agora que Legado e bênçãos possuem
                 -- origens próprias, só os poderes do aspecto anterior saem;
@@ -2147,7 +2218,7 @@
         function selecionarDeusLegado(nome)
             if sheet == nil or not temLegadoDesperto() then return end
             local atual = tostring(sheet.deusLegado or "")
-            if atual ~= "" then
+            if not modoMestreAtivo() and atual ~= "" then
                 if self.popDeus_lblCategoria ~= nil then
                     self.popDeus_lblCategoria:setText(
                         "LEGADO LACRADO — " .. atual .. " não pode ser substituído.")
@@ -2156,7 +2227,7 @@
                 return
             end
             local aspecto = tostring(sheet.aspectoDivino or "")
-            if aspecto == "" or nome == aspecto then
+            if not modoMestreAtivo() and (aspecto == "" or nome == aspecto) then
                 if self.popDeus_lblCategoria ~= nil then
                     self.popDeus_lblCategoria:setText(
                         "ESCOLHA RECUSADA — o legado deve vir de um deus diferente do pai/mãe.")
@@ -2165,7 +2236,7 @@
                 return
             end
             local d = CatalogoDeuses.buscarPorNome(nome)
-            if d == nil or not d.selecionavel or not d.kitConhecido then return end
+            if d == nil or (not modoMestreAtivo() and (not d.selecionavel or not d.kitConhecido)) then return end
 
             sheet.deusLegado = nome
             sheet.legadoLacre = true
@@ -2315,7 +2386,7 @@
             local limite = limitePericiasDoAtributo(campoTotal)
             local atual = contarItensLista(nomeLista)
             fecharTodosPopupsPericia()
-            if atual < limite then
+            if modoMestreAtivo() or atual < limite then
                 adicionarPericiaDireto(atributo, nome, nomeLista, false)
             else
                 sheet.pendPericiaAtributo = atributo
@@ -2536,7 +2607,7 @@
             end
             -- Não apagamos um poder já comprado em silêncio. A escolha é
             -- recusada e informa exatamente qual vínculo precisa ser revisto.
-            if nomeQD == "Inepto" then
+            if not modoMestreAtivo() and nomeQD == "Inepto" then
                 for _, item in ipairs(lerPoderes()) do
                     local poder = CatalogoPoderes.buscar(item.nome)
                     if poder ~= nil and poder.tipo == "passivo"
@@ -2842,6 +2913,7 @@
         -- indispensável: bloquear apenas quando o defeito entra deixaria a
         -- combinação passar se a qualidade fosse comprada depois.
         function motivoConflitoQD(tipo, nome)
+            if modoMestreAtivo() then return "" end
             local pares = {
                 ["Bastardo"] = "Nobreza", ["Nobreza"] = "Bastardo",
                 ["Endividado"] = "Riqueza", ["Riqueza"] = "Endividado",
@@ -2917,7 +2989,7 @@
                 return
             end
 
-            if nome == "Coração de mana" or nome == "Linhagem de Unaris" then
+            if not modoMestreAtivo() and (nome == "Coração de mana" or nome == "Linhagem de Unaris") then
                 local incompat = poderesAtivosQueImpedemQualidade(nome)
                 if #incompat > 0 then
                     if self.lblLimiteQDTexto ~= nil then
@@ -2928,7 +3000,7 @@
                     return
                 end
             end
-            if nome == "Sangue mortal" and quantidadePoderesKitInicial ~= nil
+            if not modoMestreAtivo() and nome == "Sangue mortal" and quantidadePoderesKitInicial ~= nil
                and quantidadePoderesKitInicial() > 2 then
                 if self.lblLimiteQDTexto ~= nil then
                     self.lblLimiteQDTexto:setText(
@@ -2938,7 +3010,7 @@
                 if self.popLimiteQD ~= nil then self.popLimiteQD:show() end
                 return
             end
-            if nome == "Poder incontrolável" then
+            if not modoMestreAtivo() and nome == "Poder incontrolável" then
                 local temAtivo = false
                 for _, item in ipairs(lerPoderes()) do
                     local poder = CatalogoPoderes.buscar(item.nome)
@@ -3028,7 +3100,7 @@
             local ganhoDefeitos = math.min(somarPontosLista("listaDefeitos"), CatalogoQD.MAX_PONTOS_DEFEITOS)
             local disponivel = CatalogoQD.PONTOS_BASE + ganhoDefeitos
             local gasto = somarPontosLista("listaQualidades")
-            if gasto + custoNecessario <= disponivel then
+            if modoMestreAtivo() or gasto + custoNecessario <= disponivel then
                 salvarQD(existente, tipo, nome, pontosAlvo, pagosAtuais + custoNecessario, nomeLista)
             else
                 sheet.pendQDTipo = tipo
@@ -3285,7 +3357,7 @@
             detalheRacaAtual = nome
 
             local ctx = contextoRacial()
-            local permitido, motivo = CatalogoRacas.podeEscolher(dados, ctx)
+            local permitido, motivo = podeEscolherRaca(dados, ctx)
 
             pcall(function() atualizarSeletorAtributoRacial() end)
             pcall(function() atualizarSeletorDefesaMental() end)
@@ -3347,7 +3419,7 @@
             if dados == nil then return end
 
             local ctx = contextoRacial()
-            local permitido = CatalogoRacas.podeEscolher(dados, ctx)
+            local permitido = podeEscolherRaca(dados, ctx)
             if not permitido then return end -- botao bloqueado: nao faz nada
 
             sheet.raca = dados.nome
@@ -3451,6 +3523,7 @@
         end
 
         function racaPrincipalPodeMesticar()
+            if modoMestreAtivo() then return true end
             local r = CatalogoRacas.buscarPorNome(racaPrincipalMestico())
             if r == nil then return false end
             return r.categoria == "Jogavel"
@@ -3551,6 +3624,7 @@
         -- Emphasis esta ligado, entao "**texto**" desenha em negrito.
         -- ---------------------------------------------------------------
         function publicarNoChat(texto, cor)
+            if fichaEmModoMestre() then return end -- sigilo antes de consultar a mesa
             pcall(function()
                 local mesa = mesaAtual()
                 if mesa == nil or mesa.chat == nil then return end
@@ -3660,7 +3734,7 @@
         -- ESTADO DO LACRE
         -- =================================================================
         function mesticagemLacrada()
-            return sheet ~= nil and sheet.mesticoLacre == true
+            return not modoMestreAtivo() and sheet ~= nil and sheet.mesticoLacre == true
         end
 
         function importacaoMesticoAntigoAtiva()
@@ -3686,10 +3760,12 @@
         end
 
         local function estaTravado(indice)
+            if modoMestreAtivo() then return false end
             return travadosMestico[indice] == true
         end
 
         local function qtdEscolhasPermitidas()
+            if modoMestreAtivo() then return #poolMestico end
             if importacaoMesticoAntigoAtiva() then
                 return totalCaracsMesticoAtual()
             end
@@ -3700,6 +3776,7 @@
         -- realmente mestiça. Para totais pares, metade vem de cada origem;
         -- para ímpares, a diferença máxima é uma (por exemplo, 3 + 2).
         local function distribuicaoMesticoEquilibrada(indices, total)
+            if modoMestreAtivo() then return true end
             if tierEfetivoMestico() < 2 then return true end
             local principal = racaPrincipalMestico()
             local daPrincipal, daSecundaria = 0, 0
@@ -3797,7 +3874,9 @@
 
             if self.popMest_lblContador ~= nil then
                 self.popMest_lblContador:setFontColor(importando and COR.gold or COR.muted)
-                if importando then
+                if modoMestreAtivo() then
+                    self.popMest_lblContador:setText("Mestre: " .. tostring(#escolhasMestico) .. " características escolhidas livremente.")
+                elseif importando then
                     local qtdPrincipal, qtdSecundaria = contagemEscolhasPorOrigem(escolhasMestico)
                     self.popMest_lblContador:setText("IMPORTAÇÃO DE FICHA ANTIGA  •  selecionadas "
                         .. tostring(#escolhasMestico) .. " de " .. tostring(total)
@@ -3817,7 +3896,9 @@
             end
 
             if self.popMest_lblBtnConfirmar ~= nil then
-                if importando then
+                if modoMestreAtivo() then
+                    self.popMest_lblBtnConfirmar:setText("SALVAR CARACTERÍSTICAS DO NPC")
+                elseif importando then
                     self.popMest_lblBtnConfirmar:setText("IMPORTAR AS CARACTERÍSTICAS  •  SEM NOVA ROLAGEM")
                     self.popMest_lblBtnConfirmar:setFontColor(COR.gold)
                 elseif lacrada then
@@ -3846,7 +3927,7 @@
             -- na ficha antiga. Por isso nenhum resultado local anterior vem
             -- pré-marcado ou lacrado, e confirmar não chama math.random.
             if importacaoMesticoAntigoAtiva() then return end
-            if not mesticagemLacrada() then return end
+            if not modoMestreAtivo() and not mesticagemLacrada() then return end
 
             local definidas = caracteristicasMesticoDefinidas()
             local convertendoTudo = sheet.mesticoReajusteAutorizado == true
@@ -3861,7 +3942,7 @@
                     if not indicesRestaurados[i]
                         and p.nome == car.nome and p.origem == car.origem then
                         indicesRestaurados[i] = true
-                        if car.modo == "Sorteada" and not convertendoTudo then
+                        if not modoMestreAtivo() and car.modo == "Sorteada" and not convertendoTudo then
                             travadosMestico[i] = true
                         else
                             table.insert(escolhasMestico, i)
@@ -3907,7 +3988,7 @@
             if outra == nil then return end
 
             -- Mesma raça dos dois lados nao e mesticagem.
-            if nome == racaPrincipalMestico() then
+            if not modoMestreAtivo() and nome == racaPrincipalMestico() then
                 if self.popMest_lblRegra ~= nil then
                     self.popMest_lblRegra:setText("A segunda raça precisa ser diferente da sua raça principal (" ..
                         racaPrincipalMestico() .. ").")
@@ -3937,7 +4018,9 @@
             if self.popMest_lblRegra ~= nil then
                 local permitidas = qtdEscolhasPermitidas()
                 local txt
-                if importacaoMesticoAntigoAtiva() then
+                if modoMestreAtivo() then
+                    txt = "Mestre: marque livremente as características do NPC. Sem sorteio nem lacre."
+                elseif importacaoMesticoAntigoAtiva() then
                     txt = "MIGRAÇÃO DE FICHA ANTIGA. Marque, na ordem, as " .. tostring(totalCaracsMesticoAtual())
                         .. " características que já pertenciam ao personagem. "
                     if migracaoAquaticaMesticoAtiva() then
@@ -3983,9 +4066,9 @@
                     if v == indice then table.remove(escolhasMestico, pos); break end
                 end
             else
-                if #escolhasMestico >= permitidas then return end -- ja no limite
+                if not modoMestreAtivo() and #escolhasMestico >= permitidas then return end -- ja no limite
                 local total = totalCaracsMesticoAtual()
-                if permitidas >= total and total > 0 and tierEfetivoMestico() >= 2 then
+                if not modoMestreAtivo() and permitidas >= total and total > 0 and tierEfetivoMestico() >= 2 then
                     local origem = poolMestico[indice].origem
                     local mesmaOrigem = 0
                     for _, idx in ipairs(escolhasMestico) do
@@ -4031,6 +4114,21 @@
         --   COM lacre  -> troca somente as ESCOLHIDAS, preservando byte a byte
         --                 as sorteadas. Nao ha rolagem nenhuma aqui.
         function confirmarMesticagem()
+            if modoMestreAtivo() then
+                local resultado = {}
+                for _, idx in ipairs(escolhasMestico) do
+                    local c = poolMestico[idx]
+                    if c ~= nil then
+                        table.insert(resultado, {nome=c.nome, descricao=c.descricao, origem=c.origem, modo="Escolhida"})
+                    end
+                end
+                gravarCaracsMestico(resultado)
+                sheet.mesticoLacre = false
+                if self.popMestico ~= nil then self.popMestico:close() end
+                atualizarBlocoRaca()
+                recalcularTudo()
+                return
+            end
             if sheet == nil or #poolMestico == 0 then return end
             if not podeEditarCriacao() and not importacaoMesticoAntigoAtiva() then
                 if self.popMestico ~= nil then self.popMestico:close() end
@@ -4455,7 +4553,7 @@
                     self.abaRaca_lblStatus:setText("Nenhuma raça selecionada ainda. Abra o catálogo acima - Deslocamento e Dado de Vida são preenchidos automaticamente na aba 06 · COMBATE.")
                     self.abaRaca_lblStatus:setFontColor("#B9D3DD")
                 else
-                    local permitido, motivo = CatalogoRacas.podeEscolher(dados, ctx)
+                    local permitido, motivo = podeEscolherRaca(dados, ctx)
                     local rotuloCat = "Jogável"
                     if dados.categoria == "NaoJogavel" then rotuloCat = "Não-jogável"
                     elseif dados.categoria == "Primordial" then rotuloCat = "Primordial" end
@@ -4752,6 +4850,7 @@
 
         -- Devolve (podeAbrir, motivo). O mestre pode liberar por fora.
         function podeAbrirSegundoSlot()
+            if modoMestreAtivo() then return true, "Mestre: escolha livre." end
             if sheet == nil then return false, "" end
             if sheet.autorizacaoMestreClasse == true then
                 return true, "Liberado por autorização do mestre."
@@ -5007,7 +5106,7 @@
             slot = (slot == 2) and 2 or 1
 
             local outro = (slot == 1) and 2 or 1
-            if tostring(sheet["classe" .. outro .. "Nome"] or "") == subclasseEmDetalhe.classe
+            if not modoMestreAtivo() and tostring(sheet["classe" .. outro .. "Nome"] or "") == subclasseEmDetalhe.classe
                 and tostring(sheet["classe" .. outro .. "Sub"] or "") == subclasseEmDetalhe.sub then
                 avisarClasse("Esta subclasse já ocupa o outro slot. Escolha uma diferente.", COR.wine)
                 return
@@ -5023,7 +5122,7 @@
 
             local info = pontosClasseInfo()
             local devolvidos = n(sheet["classe" .. slot .. "Nivel"])
-            if (info.livres + devolvidos) < 1 then
+            if not modoMestreAtivo() and (info.livres + devolvidos) < 1 then
                 avisarClasse("Sem ponto de classe livre para investir no nível 1 desta subclasse.", COR.wine)
                 return
             end
@@ -5054,7 +5153,7 @@
             local alvo = atual + delta
             local teto = CatalogoClasses.tetoDaSubclasse(subclasseEmDetalhe.classe, subclasseEmDetalhe.sub)
 
-            if alvo > teto then
+            if not modoMestreAtivo() and alvo > teto then
                 avisarClasse("Nível " .. tostring(teto) .. " é o topo desta árvore. "
                     .. "Invista os próximos pontos em outra subclasse.", COR.wine)
                 return
@@ -5065,13 +5164,13 @@
                 removerSubclasseDoSlot(slot)
                 return
             end
-            if delta > 0 and pontosClasseInfo().livres < delta then
+            if not modoMestreAtivo() and delta > 0 and pontosClasseInfo().livres < delta then
                 avisarClasse("Sem ponto de classe livre. Pontos chegam nos níveis 1, 3, 5, 8, 11, 14, 17 e 20.", COR.wine)
                 return
             end
 
             sheet["classe" .. slot .. "Nivel"] = alvo
-            if alvo >= teto then
+            if not modoMestreAtivo() and alvo >= teto then
                 avisarClasse("Árvore completa no nível " .. tostring(teto)
                     .. ". Os próximos pontos precisam ir para outra subclasse.", COR.gold)
             else
@@ -5469,6 +5568,7 @@
         -- 5 do kit nativo + margem para varias bencoes (cada bencao abre um
         -- kit inteiro de 5). 24 cobre pai/mae + 3 bencoes completas com folga.
         local MAX_SLOTS_PODER = 24
+        local paginaPoderes = 1
 
         -- Altura dos blocos quando visiveis. Ocultar = altura 0.
         local ALTURA_SLOT_PODER = 80
@@ -6459,6 +6559,7 @@
         end
 
         function deusEhAcessivel(nomeDeus)
+            if modoMestreAtivo() then return true end
             if sheet == nil or nomeDeus == nil or nomeDeus == "" then return false end
             -- "Magia" nao vem de divindade nenhuma: e o poder dos feiticos,
             -- liberado pela qualidade Coracao de Mana.
@@ -6598,6 +6699,7 @@
         end
 
         function selarAspectoDivino()
+            if modoMestreAtivo() then return end
             if sheet == nil or aspectoLacrado() then return end
             sheet.aspectoLacre = true
             sheet.aspectoLacreDeus = tostring(sheet.aspectoDivino or "")
@@ -6610,6 +6712,7 @@
         end
 
         function podeTrocarAspecto()
+            if modoMestreAtivo() then return true end
             if not aspectoLacrado() then return true end
             return sheet.autorizacaoMestreAspecto == true
         end
@@ -6648,6 +6751,21 @@
         -- COMPRA E DEVOLUCAO
         -- ---------------------------------------------------------------
         function comprarNivelPoder(nomePoder, gratuitoLegado, origemForcada, fonteGratuita)
+            if modoMestreAtivo() then
+                local poder = CatalogoPoderes.buscar(nomePoder)
+                if poder == nil then return end
+                local lista = lerPoderes()
+                local item = acharPoder(lista, nomePoder)
+                if item == nil then
+                    item = {nome = nomePoder, nivel = 0, log = "", deus = origemForcada or deusDonoDoPoder(nomePoder)}
+                    table.insert(lista, item)
+                end
+                item.nivel = n(item.nivel) + 1
+                gravarPoderes(lista)
+                atualizarBlocoPoderes()
+                recalcularTudo()
+                return
+            end
             if sheet == nil then return end
             -- A escolha única do Legado precisa funcionar também na migração
             -- de fichas antigas já finalizadas. Compras normais continuam
@@ -6983,15 +7101,15 @@
             local item = acharPoder(lista, nomePoder)
             if item == nil or n(item.nivel) <= 0 then return end
 
-            if n(item.nivel) == 1 and nomePoderLegadoGratuito() == nomePoder then
+            if not modoMestreAtivo() and n(item.nivel) == 1 and nomePoderLegadoGratuito() == nomePoder then
                 avisarPoderes("Este é o nível gratuito do Legado Desperto. O MESTRE deve revogá-lo antes de remover o poder.", COR.wine)
                 return
             end
-            if n(item.nivel) == 1 and nomePoderOcultoGratuito() == nomePoder then
+            if not modoMestreAtivo() and n(item.nivel) == 1 and nomePoderOcultoGratuito() == nomePoder then
                 avisarPoderes("Este é o nível gratuito de Poder oculto. O MESTRE deve revogar o vínculo antes de remover o poder.", COR.wine)
                 return
             end
-            if n(item.nivel) == 1 and tostring(sheet.poderIncontrolavelEscolhido or "") == nomePoder then
+            if not modoMestreAtivo() and n(item.nivel) == 1 and tostring(sheet.poderIncontrolavelEscolhido or "") == nomePoder then
                 avisarPoderes("Este poder está vinculado a Poder incontrolável. O MESTRE deve corrigir o vínculo antes de removê-lo.", COR.wine)
                 return
             end
@@ -7200,7 +7318,9 @@
             -- rodape: adquirir / subir / bloqueado
             if self.popPod_lblBtnAdquirir ~= nil then
                 local acessivel = deusEhAcessivel(nomeDeus)
-                if not acessivel then
+                if modoMestreAtivo() then
+                    self.popPod_lblBtnAdquirir:setText("ELEVAR PODER — MESTRE")
+                elseif not acessivel then
                     self.popPod_lblBtnAdquirir:setText(string.upper(motivoDeusBloqueado(nomeDeus)))
                     self.popPod_lblBtnAdquirir:setFontColor(COR.faint)
                 elseif nivelAtual == 0 then
@@ -7521,6 +7641,13 @@
         end
 
         function atualizarBlocoPoderes()
+            if sheet ~= nil then
+                local total = #poderesOrdenados()
+                local paginas = math.max(1, math.ceil(total / MAX_SLOTS_PODER))
+                paginaPoderes = math.max(1, math.min(paginaPoderes, paginas))
+                if self.abaPod_paginacao ~= nil then self.abaPod_paginacao:setHeight(paginas > 1 and 32 or 0) end
+                if self.abaPod_lblPagina ~= nil then self.abaPod_lblPagina:setText("Página " .. paginaPoderes .. " / " .. paginas) end
+            end
             if sheet == nil then return end
 
             local totais = pontosPoderTotais()
@@ -7547,7 +7674,7 @@
 
             local grupoAnterior = nil
             for i = 1, MAX_SLOTS_PODER do
-                local item = lista[i]
+                local item = lista[(paginaPoderes - 1) * MAX_SLOTS_PODER + i]
                 definirAlturaPod(self["abaPod_wrapSlot" .. i],
                     (item ~= nil) and ALTURA_SLOT_PODER or 0)
 
@@ -7622,7 +7749,7 @@
 
                     local lblCont = self["abaPod_lblCont" .. i]
                     if lblCont ~= nil then
-                        lblCont:setText(nivel .. " / " .. teto)
+                        lblCont:setText(modoMestreAtivo() and tostring(nivel) or (nivel .. " / " .. teto))
                         if nivel >= teto then lblCont:setFontColor(COR.moss)
                         else lblCont:setFontColor(COR.muted) end
                     end
@@ -7648,11 +7775,11 @@
             end
 
             if self.abaPod_lblLimites ~= nil then
-                self.abaPod_lblLimites:setText(
+                self.abaPod_lblLimites:setText(modoMestreAtivo() and "MESTRE — sem limites de jogador; anúncios bloqueados" or (
                     "Passivos " .. qtdPassivosAdquiridos() .. "/3          " ..
                     "Poderes de atributo " .. qtdPoderesDeAtributo() .. "/2" ..
                     "          Teto de passivo no nível " .. n(sheet.nivel) ..
-                    ": " .. tetoNivelPassivo())
+                    ": " .. tetoNivelPassivo()))
                 self.abaPod_lblLimites:setFontColor(COR.faint)
             end
 
@@ -7674,20 +7801,31 @@
         end
 
         -- Botoes +/- de cada linha (indice do slot vem gravado no XML).
+        function indicePoderDaLinha(linha)
+            return (paginaPoderes - 1) * MAX_SLOTS_PODER + linha
+        end
+
+        function mudarPaginaPoderes(delta)
+            local paginas = math.max(1, math.ceil(#poderesOrdenados() / MAX_SLOTS_PODER))
+            paginaPoderes = math.max(1, math.min(paginaPoderes + n(delta), paginas))
+            atualizarBlocoPoderes()
+        end
+
         function slotPoderMais(indice)
-            local item = poderesOrdenados()[indice]
+
+            local item = poderesOrdenados()[indicePoderDaLinha(indice)]
             if item == nil then return end
             comprarNivelPoder(item.nome)
         end
 
         function slotPoderMenos(indice)
-            local item = poderesOrdenados()[indice]
+            local item = poderesOrdenados()[indicePoderDaLinha(indice)]
             if item == nil then return end
             devolverNivelPoder(item.nome)
         end
 
         function slotPoderDetalhe(indice)
-            local item = poderesOrdenados()[indice]
+            local item = poderesOrdenados()[indicePoderDaLinha(indice)]
             if item == nil then return end
             mostrarDetalhePoder(item.nome, item.deus)
             abrirPopupPoderes()
@@ -7991,6 +8129,7 @@
 
         -- Habilidade de classe nao depende de poder: todos os ranks liberados.
         function ranksLiberadosParaTipo(tipo, nomePoder)
+            if modoMestreAtivo() then return CatalogoHabilidades.ranks end
             if tipo == "classe" then
                 return CatalogoHabilidades.ranks
             end
@@ -8381,7 +8520,7 @@
             -- pre-seleciona o primeiro poder ativo disponivel
             local ativos = poderesAtivosAdquiridos()
             if tipo == "poder" then
-                if #ativos == 0 then
+                if not modoMestreAtivo() and #ativos == 0 then
                     if nivelDoPoder("Magia") > 0 then
                         avisarHabilidades("O poder Magia gera feitiços, não habilidades comuns. " ..
                             "Use o botão FEITIÇO, ou crie uma habilidade de classe.", COR.muted)
@@ -8391,9 +8530,9 @@
                     end
                     return
                 end
-                habRascunho.poderVinculado = ativos[1].nome
+                habRascunho.poderVinculado = ativos[1] ~= nil and ativos[1].nome or ""
             elseif tipo == "feitico" then
-                if nivelDoPoder("Magia") < 1 then
+                if not modoMestreAtivo() and nivelDoPoder("Magia") < 1 then
                     avisarHabilidades("Feitiços exigem o poder \"Magia\" (qualidade Coração de Mana).", COR.muted)
                     return
                 end
@@ -8569,7 +8708,7 @@
         function alternarTagHab(nomeTag)
             lerCamposDoConstrutor()
             if habRascunho == nil then return end
-            if #habRascunho.tags >= limiteTagsAtual() then
+            if not modoMestreAtivo() and #habRascunho.tags >= limiteTagsAtual() then
                 avisarConstrutor("Rank " .. habRascunho.rank .. " permite no máximo " ..
                     limiteTagsAtual() .. " tags (repetições contam como vagas).", COR.wine)
                 return
@@ -8579,7 +8718,7 @@
             for _, t in ipairs(habRascunho.tags) do table.insert(teste, t) end
             table.insert(teste, nomeTag)
             local a, b = CatalogoHabilidades.conflitoDeTags(teste, habRascunho.rank)
-            if a ~= nil then
+            if not modoMestreAtivo() and a ~= nil then
                 avisarConstrutor("Tags opostas: [" .. a .. "] e [" .. b ..
                     "] não podem estar na mesma habilidade (só no rank EX).", COR.wine)
                 return
@@ -8655,13 +8794,13 @@
                 avisarConstrutor("Dê um nome à habilidade.", COR.wine); return
             end
 
-            if habRascunho.tipo ~= "classe" and habRascunho.tipo ~= "universal"
+            if not modoMestreAtivo() and habRascunho.tipo ~= "classe" and habRascunho.tipo ~= "universal"
                and habRascunho.tipo ~= "forma" and habRascunho.poderVinculado == "" then
                 avisarConstrutor("Escolha o poder de origem.", COR.wine); return
             end
 
             -- Progressiva sem nenhum bloco preenchido nao progride nada.
-            if habRascunho.tipo == "universal" and habRascunho.progressiva then
+            if not modoMestreAtivo() and habRascunho.tipo == "universal" and habRascunho.progressiva then
                 local algum = false
                 for _, r in ipairs(CatalogoProgressiva.RANKS) do
                     if tostring(habRascunho["efeitoRank" .. r] or ""):gsub("%s", "") ~= "" then
@@ -8675,7 +8814,7 @@
             end
 
             -- Magia so produz feiticos, nunca habilidade comum.
-            if habRascunho.tipo == "poder" and habRascunho.poderVinculado == "Magia" then
+            if not modoMestreAtivo() and habRascunho.tipo == "poder" and habRascunho.poderVinculado == "Magia" then
                 avisarConstrutor("O poder Magia gera feitiços, não habilidades. Use o tipo FEITIÇO.", COR.wine)
                 return
             end
@@ -8692,7 +8831,7 @@
             -- saldo: o custo entra no mesmo pool dos poderes
             local jaPago = 0
             if habEmEdicao ~= nil then jaPago = n(habEmEdicao.custoPago) end
-            if custo - jaPago > saldoPontosPoder() then
+            if not modoMestreAtivo() and custo - jaPago > saldoPontosPoder() then
                 avisarConstrutor("Sem pontos suficientes: esta habilidade custa " .. custo ..
                     " e você tem " .. saldoPontosPoder() .. " disponível(is).", COR.wine)
                 return
@@ -9164,8 +9303,9 @@
 
             -- tags
             if self.popHab_lblTagsLimite ~= nil then
-                self.popHab_lblTagsLimite:setText("TAGS  " .. #habRascunho.tags .. " / " ..
-                    limiteTagsAtual() .. "   ·   clique acumula")
+                self.popHab_lblTagsLimite:setText(modoMestreAtivo() and
+                    ("TAGS  " .. #habRascunho.tags .. " — sem limite") or
+                    ("TAGS  " .. #habRascunho.tags .. " / " .. limiteTagsAtual() .. "   ·   clique acumula"))
             end
             for _, t in ipairs(CatalogoHabilidades.todasAsTags()) do
                 local card = self["popHab_tag" .. chavePoder(t.nome)]
@@ -9688,6 +9828,7 @@
         -- ocorre na entrada, sem apagar silenciosamente perícias de fichas
         -- antigas — estas continuam visíveis para revisão do mestre.
         function motivoPericiaBloqueada(atributo, nomePericia)
+            if modoMestreAtivo() then return "" end
             if nomePericia == "Coragem" and temDefeitoNaFicha("Covarde") then
                 return "Covarde impede adquirir a perícia Coragem. [livro 1.3 — efeito do defeito]"
             end
@@ -10239,6 +10380,7 @@
 
         -- Corta o que passou do teto e devolve um aviso, se cortou algo.
         function aplicarLimitesDeAtributo()
+            if modoMestreAtivo() then return "" end
             if sheet == nil then return "" end
             local cortados = {}
             -- percorre CAMPO_ATRIBUTO (local DESTE bloco) e nao
@@ -10873,6 +11015,7 @@
         end
 
         function sincronizarHabilidadeDaTribo()
+            if modoMestreAtivo() then return end
             if sheet == nil or self.listaHabilidades == nil then return end
             local desejada, medido = habilidadeDaTriboAtual()
             -- "Nao sei" nao autoriza apagar: o laco abaixo deleta toda
@@ -10927,6 +11070,7 @@
         local ORIGEM_HABILIDADE_RACIAL = "racial:Sereias"
 
         function sincronizarHabilidadesRaciaisConcedidas()
+            if modoMestreAtivo() then return end -- NPC conserva habilidades manuais
             if sheet == nil or self.listaHabilidades == nil then return end
 
             -- Mantém também a automação já existente das tribos de Lobisomem.
@@ -12534,8 +12678,8 @@
 
             -- Inspiracao: comeca em 3 e o teto e 3.
             if sheet.pontosInspiracao == nil then sheet.pontosInspiracao = 3 end
-            if n(sheet.pontosInspiracao) > 3 then sheet.pontosInspiracao = 3 end
-            if n(sheet.pontosInspiracao) < 0 then sheet.pontosInspiracao = 0 end
+            if not modoMestreAtivo() and n(sheet.pontosInspiracao) > 3 then sheet.pontosInspiracao = 3 end
+            if not modoMestreAtivo() and n(sheet.pontosInspiracao) < 0 then sheet.pontosInspiracao = 0 end
             porValor("Inspiracao", n(sheet.pontosInspiracao))
             porTexto("Inspiracao", "de 3  ·  gaste e recupere no campo ATUAL")
 
@@ -12559,7 +12703,9 @@
                 -- o valor: mostra o total e avisa, por decisao da mesa.
                 local teto = DadosSistema.limiteAcoesPorNivel(nivel)
                 local somadas = n(sheet.acoesPadrao) + n(sheet.acoesBonus)
-                if somadas > teto then
+                if modoMestreAtivo() then
+                    table.insert(linhas, "Mestre: ações sem teto de jogador.")
+                elseif somadas > teto then
                     table.insert(linhas, "⚠ Teto de ações do nível " .. nivel ..
                         ": " .. teto .. " por turno (padrão + bônus somadas). " ..
                         "Suas fontes dão " .. somadas .. " — o livro não deixa usar todas no mesmo turno.")
@@ -12735,7 +12881,7 @@
                 avisarFavores("Somente o MESTRE registra favores: eles só vêm de narrativas oficiais.", COR.wine)
                 return
             end
-            if delta > 0 and deusEhMacula(nomeDeus) then
+            if not modoMestreAtivo() and delta > 0 and deusEhMacula(nomeDeus) then
                 avisarFavores(nomeDeus .. " é a sua Mácula divina — você nunca ganha favores dela.", COR.wine)
                 return
             end
@@ -12751,11 +12897,11 @@
             end
 
             local novo = alvo.valor + delta
-            if novo > FAVOR_MAXIMO then
+            if not modoMestreAtivo() and novo > FAVOR_MAXIMO then
                 avisarFavores("Teto de " .. FAVOR_MAXIMO .. " favores por divindade atingido em " .. nomeDeus .. ".", COR.muted)
                 novo = FAVOR_MAXIMO
             end
-            if novo < FAVOR_MINIMO then
+            if not modoMestreAtivo() and novo < FAVOR_MINIMO then
                 avisarFavores("Piso de " .. formatarFavor(FAVOR_MINIMO) ..
                     " favores por divindade atingido em " .. nomeDeus .. ".", COR.wine)
                 novo = FAVOR_MINIMO
@@ -12882,7 +13028,7 @@
             end
             local atual = favorDoDeus(nomeDeus)
             local custo = (tipo == "poder1") and 2 or 3
-            if atual < custo then
+            if not modoMestreAtivo() and atual < custo then
                 avisarFavores("São necessários " .. custo .. " favores com " .. nomeDeus ..
                     " para esta troca (você tem " .. formatarFavor(atual) .. ").", COR.muted)
                 return
@@ -12896,7 +13042,7 @@
                 sheet.poderPontosConcedidos = n(sheet.poderPontosConcedidos) + 3
                 descricao = "3 pontos de poder"
             elseif tipo == "bencao" then
-                if deusEhAcessivel(nomeDeus) then
+                if not modoMestreAtivo() and deusEhAcessivel(nomeDeus) then
                     avisarFavores("Você já tem acesso ao kit de " .. nomeDeus .. ".", COR.muted)
                     return
                 end
@@ -12908,11 +13054,11 @@
                 -- So faz sentido com a propria divindade: o aspecto proclama
                 -- o semideus como campeao ou profeta. Com um deus que nao e o
                 -- seu, o equivalente e a bencao.
-                if tostring(sheet.aspectoDivino or "") ~= nomeDeus then
+                if not modoMestreAtivo() and tostring(sheet.aspectoDivino or "") ~= nomeDeus then
                     avisarFavores("A proclamação só vem do seu próprio Aspecto Divino.", COR.wine)
                     return
                 end
-                if tostring(sheet.proclamadoPor or "") ~= "" then
+                if not modoMestreAtivo() and tostring(sheet.proclamadoPor or "") ~= "" then
                     avisarFavores("Você já foi proclamado por " .. tostring(sheet.proclamadoPor) .. ".", COR.muted)
                     return
                 end
@@ -12939,7 +13085,7 @@
                         alvo = {deus = MAE_CELESTIAL, valor = 0}
                         table.insert(lista, alvo)
                     end
-                    alvo.valor = math.min(alvo.valor + 1, FAVOR_MAXIMO)
+                    alvo.valor = (modoMestreAtivo() and (alvo.valor + 1) or math.min(alvo.valor + 1, FAVOR_MAXIMO))
                     gravarFavores(lista)
                     publicarNoChat(anuncio("troca", "TROCA DE FAVORES",
                      tostring(sheet.nome or "Personagem") ..
@@ -13356,7 +13502,7 @@
                     alvo = {deus = nomeDeus, valor = 0}
                     table.insert(lista, alvo)
                 end
-                alvo.valor = math.min(alvo.valor + 1, FAVOR_MAXIMO)
+                alvo.valor = (modoMestreAtivo() and (alvo.valor + 1) or math.min(alvo.valor + 1, FAVOR_MAXIMO))
                 gravarFavores(lista)
                 publicarNoChat(anuncio("troca", "TROCA DE FAVORES",
                      tostring(sheet.nome or "Personagem") ..
@@ -14523,7 +14669,7 @@
             if achou ~= nil then
                 table.remove(atuais, achou)
             else
-                if quantidadeEncantamentosItem(it) >= n(it.slotsEnc) then
+                if not modoMestreAtivo() and quantidadeEncantamentosItem(it) >= n(it.slotsEnc) then
                     avisarInventario("Este item tem " .. n(it.slotsEnc) ..
                         " slot(s) de encantamento. Aumente os slots no editor se ele foi forjado com mais.", COR.muted)
                     return
@@ -14681,7 +14827,7 @@
                 return
             end
             local jaExistia = tostring(it[prefixo .. "Nome"] or "") ~= ""
-            if not jaExistia and quantidadeEncantamentosItem(it) >= n(it.slotsEnc) then
+            if not modoMestreAtivo() and not jaExistia and quantidadeEncantamentosItem(it) >= n(it.slotsEnc) then
                 avisarInventario("Este item já usa todos os seus " .. n(it.slotsEnc) .. " slot(s) de encantamento.", COR.wine)
                 return
             end
@@ -14823,6 +14969,7 @@
         -- Le o requisito GRAVADO no item: uma arma forjada pode exigir mais
         -- ou menos que o modelo do catalogo.
         function podeEquipar(it, chaveSlot)
+            if it ~= nil and modoMestreAtivo() then return true, "" end
             if it == nil then return false, "" end
             if it.reqAtributo ~= nil and it.reqAtributo ~= "" and n(it.reqValor) > 0 then
                 local tem = valorDoAtributo(it.reqAtributo)
@@ -14903,7 +15050,7 @@
             if it == nil then return end
             if destino == "mochila" and it.onde ~= "mochila" then
                 -- volta para a mochila: confere espaco
-                if espacosOcupados() >= capacidadeMochila() then
+                if not modoMestreAtivo() and espacosOcupados() >= capacidadeMochila() then
                     avisarInventario("Mochila cheia (" .. espacosOcupados() .. "/" ..
                         capacidadeMochila() .. " espaços).", COR.wine)
                     return
@@ -14952,7 +15099,7 @@
                 avisarInventario(motivoTravaCriacao(), COR.wine); return
             end
             local lista = lerItens()
-            if #lista >= MAX_ITENS_INVENTARIO then
+            if not modoMestreAtivo() and #lista >= MAX_ITENS_INVENTARIO then
                 avisarInventario("Limite de " .. MAX_ITENS_INVENTARIO .. " registros de itens na ficha.", COR.wine); return
             end
             local it = itemDoCatalogo(nome, qualidade)
@@ -14974,7 +15121,7 @@
                 avisarInventario(motivoTravaCriacao(), COR.wine); return
             end
             local lista = lerItens()
-            if #lista >= MAX_ITENS_INVENTARIO then
+            if not modoMestreAtivo() and #lista >= MAX_ITENS_INVENTARIO then
                 avisarInventario("Limite de " .. MAX_ITENS_INVENTARIO .. " registros de itens na ficha.", COR.wine); return
             end
             local novo = {nome = "Item novo", categoria = "Livre", qualidade = "Livre",
@@ -15045,7 +15192,7 @@
                 -- texto nao deu.
                 local abs = n(efeitos.absorcao) + n(sheet.bonusBestaAbsorcao)
                 local teto = n(sheet.bonusBestaTetoAbs)
-                if teto > 0 and abs > teto then abs = teto end
+                if not modoMestreAtivo() and teto > 0 and abs > teto then abs = teto end
                 self.abaInv_lblAbsorcao:setText(abs .. "%")
                 if n(sheet.bonusBestaAbsorcao) > 0 then
                     self.abaInv_lblAbsorcao:setFontColor(COR.gold)
@@ -16515,7 +16662,7 @@
                          O numero e ESCRITO A MAO aqui e conferido pela
                          checagem 27 contra o module.xml - se alguem esquecer
                          de subir um dos dois, o build para. -->
-                    <label name="lblVersaoFicha" align="left" width="52" text="v0.53.43" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
+                    <label name="lblVersaoFicha" align="left" width="52" text="v0.54.0" fontFamily="Marcellus SC" fontColor="#3A4750" fontSize="11" vertTextAlign="center" wordWrap="false" hitTest="false"/>
                     <label name="lblSecaoAtual" align="client" text="SEÇÃO 01  •  DADOS PESSOAIS" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="12" vertTextAlign="center" margins="{left=8}"/>
                 </layout>
 
@@ -16523,8 +16670,8 @@
                     <rectangle align="right" width="62" color="#111A1E" strokeColor="#1A262C" strokeSize="1" xradius="3" yradius="3" margins="{top=11,bottom=11}" hitTest="false">
                         <label name="lblSecaoContador" align="client" text="1 / 9" fontFamily="Marcellus SC" fontColor="#5F7078" fontSize="11" horzTextAlign="center" vertTextAlign="center"/>
                     </rectangle>
-                    <rectangle name="rectSeloFinalizada" align="right" width="170" color="#111A1E" strokeColor="#4E8C74" strokeSize="1" xradius="3" yradius="3" margins="{top=9,bottom=9,right=8}" cursor="handPoint" hint="Clique para finalizar a ficha (trava Qualidades, Raça e Favores). Só o mestre pode destravar depois.">
-                        <event name="onClick"><![CDATA[alternarFichaFinalizada();]]></event>
+                    <rectangle name="rectSeloFinalizada" align="right" width="170" color="#111A1E" strokeColor="#4E8C74" strokeSize="1" xradius="3" yradius="3" margins="{top=9,bottom=9,right=8}" cursor="handPoint" hint="Escolher modo: Em criação, Ficha finalizada ou Mestre (NPC sigiloso).">
+                        <event name="onClick"><![CDATA[abrirSeletorModoFicha();]]></event>
                         <label name="lblSeloFinalizada" align="client" text="EM CRIAÇÃO" fontFamily="Marcellus SC" fontColor="#4E8C74" fontSize="11" horzTextAlign="center" vertTextAlign="center" hitTest="false"/>
                     </rectangle>
                 </layout>
@@ -18497,6 +18644,17 @@
                          tornar visivel em runtime um elemento align="top" que estava
                          invisivel o joga para o TOPO da pilha. Altura 0 mantem a
                          ordem cravada pela declaracao. -->
+                    <layout name="abaPod_paginacao" align="top" height="0">
+                        <rectangle align="left" width="110" color="#111A1E" strokeColor="#22323A" strokeSize="1" cursor="handPoint">
+                            <label align="client" text="ANTERIOR" fontFamily="Marcellus SC" fontSize="11" fontColor="#C9A24B" horzTextAlign="center" vertTextAlign="center" hitTest="false"/>
+                            <event name="onClick"><![CDATA[mudarPaginaPoderes(-1);]]></event>
+                        </rectangle>
+                        <rectangle align="right" width="110" color="#111A1E" strokeColor="#22323A" strokeSize="1" cursor="handPoint">
+                            <label align="client" text="PRÓXIMA" fontFamily="Marcellus SC" fontSize="11" fontColor="#C9A24B" horzTextAlign="center" vertTextAlign="center" hitTest="false"/>
+                            <event name="onClick"><![CDATA[mudarPaginaPoderes(1);]]></event>
+                        </rectangle>
+                        <label name="abaPod_lblPagina" align="client" text="" fontFamily="Marcellus SC" fontSize="11" fontColor="#8C9AA0" horzTextAlign="center" vertTextAlign="center"/>
+                    </layout>
                     <layout name="abaPod_wrapGrupo1" align="top" height="0">
                         <layout align="client" margins="{top=6,bottom=2}">
                             <label align="left" width="16" text="◆" fontFamily="Petrichor Simbolos" fontColor="#8A63C9" fontSize="11" vertTextAlign="center" hitTest="false"/>
@@ -21031,7 +21189,7 @@
                     <layout name="abaInv_wrapItem1" align="top" height="0">
                         <layout name="abaInv_wrapGrupo1" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo1" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo1" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo1" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21102,7 +21260,7 @@
                     <layout name="abaInv_wrapItem2" align="top" height="0">
                         <layout name="abaInv_wrapGrupo2" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo2" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo2" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo2" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21173,7 +21331,7 @@
                     <layout name="abaInv_wrapItem3" align="top" height="0">
                         <layout name="abaInv_wrapGrupo3" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo3" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo3" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo3" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21244,7 +21402,7 @@
                     <layout name="abaInv_wrapItem4" align="top" height="0">
                         <layout name="abaInv_wrapGrupo4" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo4" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo4" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo4" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21315,7 +21473,7 @@
                     <layout name="abaInv_wrapItem5" align="top" height="0">
                         <layout name="abaInv_wrapGrupo5" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo5" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo5" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo5" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21386,7 +21544,7 @@
                     <layout name="abaInv_wrapItem6" align="top" height="0">
                         <layout name="abaInv_wrapGrupo6" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo6" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo6" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo6" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21457,7 +21615,7 @@
                     <layout name="abaInv_wrapItem7" align="top" height="0">
                         <layout name="abaInv_wrapGrupo7" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo7" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo7" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo7" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21528,7 +21686,7 @@
                     <layout name="abaInv_wrapItem8" align="top" height="0">
                         <layout name="abaInv_wrapGrupo8" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo8" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo8" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo8" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21599,7 +21757,7 @@
                     <layout name="abaInv_wrapItem9" align="top" height="0">
                         <layout name="abaInv_wrapGrupo9" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo9" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo9" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo9" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21670,7 +21828,7 @@
                     <layout name="abaInv_wrapItem10" align="top" height="0">
                         <layout name="abaInv_wrapGrupo10" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo10" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo10" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo10" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21741,7 +21899,7 @@
                     <layout name="abaInv_wrapItem11" align="top" height="0">
                         <layout name="abaInv_wrapGrupo11" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo11" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo11" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo11" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21812,7 +21970,7 @@
                     <layout name="abaInv_wrapItem12" align="top" height="0">
                         <layout name="abaInv_wrapGrupo12" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo12" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo12" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo12" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21883,7 +22041,7 @@
                     <layout name="abaInv_wrapItem13" align="top" height="0">
                         <layout name="abaInv_wrapGrupo13" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo13" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo13" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo13" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -21954,7 +22112,7 @@
                     <layout name="abaInv_wrapItem14" align="top" height="0">
                         <layout name="abaInv_wrapGrupo14" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo14" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo14" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo14" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22025,7 +22183,7 @@
                     <layout name="abaInv_wrapItem15" align="top" height="0">
                         <layout name="abaInv_wrapGrupo15" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo15" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo15" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo15" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22096,7 +22254,7 @@
                     <layout name="abaInv_wrapItem16" align="top" height="0">
                         <layout name="abaInv_wrapGrupo16" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo16" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo16" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo16" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22167,7 +22325,7 @@
                     <layout name="abaInv_wrapItem17" align="top" height="0">
                         <layout name="abaInv_wrapGrupo17" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo17" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo17" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo17" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22238,7 +22396,7 @@
                     <layout name="abaInv_wrapItem18" align="top" height="0">
                         <layout name="abaInv_wrapGrupo18" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo18" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo18" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo18" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22309,7 +22467,7 @@
                     <layout name="abaInv_wrapItem19" align="top" height="0">
                         <layout name="abaInv_wrapGrupo19" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo19" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo19" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo19" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22380,7 +22538,7 @@
                     <layout name="abaInv_wrapItem20" align="top" height="0">
                         <layout name="abaInv_wrapGrupo20" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo20" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo20" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo20" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22451,7 +22609,7 @@
                     <layout name="abaInv_wrapItem21" align="top" height="0">
                         <layout name="abaInv_wrapGrupo21" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo21" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo21" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo21" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22522,7 +22680,7 @@
                     <layout name="abaInv_wrapItem22" align="top" height="0">
                         <layout name="abaInv_wrapGrupo22" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo22" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo22" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo22" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22593,7 +22751,7 @@
                     <layout name="abaInv_wrapItem23" align="top" height="0">
                         <layout name="abaInv_wrapGrupo23" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo23" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo23" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo23" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22664,7 +22822,7 @@
                     <layout name="abaInv_wrapItem24" align="top" height="0">
                         <layout name="abaInv_wrapGrupo24" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo24" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo24" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo24" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22735,7 +22893,7 @@
                     <layout name="abaInv_wrapItem25" align="top" height="0">
                         <layout name="abaInv_wrapGrupo25" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo25" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo25" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo25" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22806,7 +22964,7 @@
                     <layout name="abaInv_wrapItem26" align="top" height="0">
                         <layout name="abaInv_wrapGrupo26" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo26" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo26" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo26" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22877,7 +23035,7 @@
                     <layout name="abaInv_wrapItem27" align="top" height="0">
                         <layout name="abaInv_wrapGrupo27" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo27" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo27" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo27" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -22948,7 +23106,7 @@
                     <layout name="abaInv_wrapItem28" align="top" height="0">
                         <layout name="abaInv_wrapGrupo28" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo28" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo28" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo28" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23019,7 +23177,7 @@
                     <layout name="abaInv_wrapItem29" align="top" height="0">
                         <layout name="abaInv_wrapGrupo29" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo29" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo29" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo29" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23090,7 +23248,7 @@
                     <layout name="abaInv_wrapItem30" align="top" height="0">
                         <layout name="abaInv_wrapGrupo30" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo30" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo30" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo30" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23161,7 +23319,7 @@
                     <layout name="abaInv_wrapItem31" align="top" height="0">
                         <layout name="abaInv_wrapGrupo31" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo31" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo31" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo31" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23232,7 +23390,7 @@
                     <layout name="abaInv_wrapItem32" align="top" height="0">
                         <layout name="abaInv_wrapGrupo32" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo32" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo32" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo32" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23303,7 +23461,7 @@
                     <layout name="abaInv_wrapItem33" align="top" height="0">
                         <layout name="abaInv_wrapGrupo33" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo33" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo33" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo33" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23374,7 +23532,7 @@
                     <layout name="abaInv_wrapItem34" align="top" height="0">
                         <layout name="abaInv_wrapGrupo34" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo34" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo34" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo34" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23445,7 +23603,7 @@
                     <layout name="abaInv_wrapItem35" align="top" height="0">
                         <layout name="abaInv_wrapGrupo35" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo35" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo35" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo35" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23516,7 +23674,7 @@
                     <layout name="abaInv_wrapItem36" align="top" height="0">
                         <layout name="abaInv_wrapGrupo36" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo36" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo36" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo36" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23587,7 +23745,7 @@
                     <layout name="abaInv_wrapItem37" align="top" height="0">
                         <layout name="abaInv_wrapGrupo37" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo37" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo37" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo37" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23658,7 +23816,7 @@
                     <layout name="abaInv_wrapItem38" align="top" height="0">
                         <layout name="abaInv_wrapGrupo38" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo38" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo38" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo38" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23729,7 +23887,7 @@
                     <layout name="abaInv_wrapItem39" align="top" height="0">
                         <layout name="abaInv_wrapGrupo39" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo39" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo39" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo39" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -23800,7 +23958,7 @@
                     <layout name="abaInv_wrapItem40" align="top" height="0">
                         <layout name="abaInv_wrapGrupo40" align="top" height="0">
                             <label align="left" width="22" text="&#9670;" fontFamily="Petrichor Simbolos" fontColor="#C9A24B" fontSize="14" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
-                            <label name="abaInv_lblGrupo40" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="13" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
+                            <label name="abaInv_lblGrupo40" align="left" width="330" text="" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" hitTest="false"/>
                             <rectangle name="abaInv_linhaGrupo40" align="client" height="1" color="#1E2A31" margins="{left=4,right=4,top=16,bottom=16}" hitTest="false"/>
                         </layout>
                         <rectangle align="client" color="#0D1317" strokeColor="#1E2A31" strokeSize="1" xradius="5" yradius="5" margins="{bottom=6}">
@@ -24579,6 +24737,27 @@
          Poderes, Qualidades...): cabecalho + texto de regra + lista rolavel
          de cards clicaveis + rodape com acoes.
          ================================================================= -->
+    <popup name="popModoFicha" width="500" height="290" backOpacity="0.75" cancelable="true">
+        <rectangle align="client" color="#070A0C" strokeColor="#8A63C9" strokeSize="1" xradius="4" yradius="4">
+            <layout align="client" margins="{left=18,right=18,top=16,bottom=16}">
+                <label align="top" height="28" text="MODO DA FICHA" fontFamily="Cinzel Decorative" fontSize="15" fontColor="#C9A24B"/>
+                <label name="lblSaidaModoMestre" align="top" height="54" text="" fontFamily="EB Garamond" fontSize="12" fontColor="#8C9AA0" wordWrap="true"/>
+                <rectangle name="btnModoFicha_criacao" align="top" height="40" color="#111A1E" strokeColor="#4E8C74" strokeSize="1" xradius="3" yradius="3" margins="{bottom=6}" cursor="handPoint">
+                    <label align="client" text="EM CRIAÇÃO" fontFamily="Marcellus SC" fontSize="11" fontColor="#4E8C74" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
+                    <event name="onClick"><![CDATA[definirModoFicha("criacao");]]></event>
+                </rectangle>
+                <rectangle name="btnModoFicha_finalizada" align="top" height="40" color="#111A1E" strokeColor="#C9A24B" strokeSize="1" xradius="3" yradius="3" margins="{bottom=6}" cursor="handPoint">
+                    <label align="client" text="FICHA FINALIZADA" fontFamily="Marcellus SC" fontSize="11" fontColor="#C9A24B" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
+                    <event name="onClick"><![CDATA[definirModoFicha("finalizada");]]></event>
+                </rectangle>
+                <rectangle name="btnModoFicha_mestre" align="top" height="40" color="#111A1E" strokeColor="#8A63C9" strokeSize="1" xradius="3" yradius="3" margins="{bottom=6}" cursor="handPoint">
+                    <label align="client" text="MESTRE — NPC SIGILOSO" fontFamily="Marcellus SC" fontSize="11" fontColor="#8A63C9" vertTextAlign="center" horzTextAlign="center" hitTest="false"/>
+                    <event name="onClick"><![CDATA[definirModoFicha("mestre");]]></event>
+                </rectangle>
+            </layout>
+        </rectangle>
+    </popup>
+
     <popup name="popTracos" width="820" height="560" backOpacity="0.75" cancelable="true">
         <rectangle align="client" color="#070A0C" strokeColor="#C9A24B" strokeSize="2" xradius="6" yradius="6" hitTest="false">
             <layout align="client" margins="{left=20,right=20,top=16,bottom=16}">
@@ -27143,7 +27322,7 @@
                 <!-- Uma única página vertical. A altura do popup é ajustada à
                      janela; esta rolagem mantém todo o conteúdo alcançável. -->
                 <scrollBox name="popHab_scrollUnico" align="client" margins="{right=4}">
-                    <label align="top" height="26" text="CONFIGURAÇÃO" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="14" fontStyle="bold" vertTextAlign="center" margins="{top=8}" hitTest="false"/>
+                    <label align="top" height="26" text="CONFIGURAÇÃO" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" margins="{top=8}" hitTest="false"/>
                     <rectangle align="top" height="1" color="#C9A24B" margins="{bottom=10}" hitTest="false"/>
 
                             <label align="top" height="14" text="TAGS ESCOLHIDAS  (clique para remover uma)" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" hitTest="false"/>
@@ -27704,7 +27883,7 @@
                         </layout>
                     </rectangle>
                     </layout>
-                    <label align="top" height="26" text="DESCRIÇÃO &amp; EFEITO" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="14" fontStyle="bold" vertTextAlign="center" margins="{top=8}" hitTest="false"/>
+                    <label align="top" height="26" text="DESCRIÇÃO &amp; EFEITO" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" margins="{top=8}" hitTest="false"/>
                     <rectangle align="top" height="1" color="#C9A24B" margins="{bottom=10}" hitTest="false"/>
 
                             <label align="top" height="16" text="DESCRIÇÃO · O QUE SE VÊ" fontFamily="Marcellus SC" fontColor="#8C9AA0" fontSize="11" hitTest="false"/>
@@ -27758,7 +27937,7 @@
                             </layout>
 
 
-                    <label align="top" height="26" text="ARTE DA HABILIDADE" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="14" fontStyle="bold" vertTextAlign="center" margins="{top=8}" hitTest="false"/>
+                    <label align="top" height="26" text="ARTE DA HABILIDADE" fontFamily="Cinzel Decorative" fontColor="#C9A24B" fontSize="15" fontStyle="bold" vertTextAlign="center" margins="{top=8}" hitTest="false"/>
                     <rectangle align="top" height="1" color="#C9A24B" margins="{bottom=10}" hitTest="false"/>
                     <label align="top" height="24" text="Clique na moldura para escolher uma imagem. A arte é exibida inteira, sem recorte." fontFamily="EB Garamond" fontColor="#A8B5BA" fontSize="13" hitTest="false"/>
                     <rectangle name="popHab_molduraArte" align="top" height="320" color="#080B0E" strokeColor="#3A2E52" strokeSize="1" xradius="4" yradius="4" margins="{left=280,right=280,bottom=10}">
